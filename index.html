@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#2a0a0e" />
+  <meta name="description" content="Lahore Rush — a 3D endless 125 bike runner through 37 real places of Lahore. Wheelies, backflips, Basant kites and Lahori swag." />
+  <title>Lahore Rush</title>
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Lahore Rush — 125 te poora Lahore, browser vich" />
+  <meta property="og:description" content="Ride a 125 through Delhi Gate, Anarkali, Minar-e-Pakistan, Canal Road and MM Alam Road. Endless, free, no install." />
+  <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+  <link rel="preload" href="/logo.svg" as="image" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Playfair+Display:ital,wght@0,700;0,900;1,400&family=Noto+Nastaliq+Urdu:wght@500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+  <script>
+    // Catch the install prompt as early as possible (it can fire before the game boots) + register the service worker.
+    window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.__installPrompt = e; window.dispatchEvent(new Event('install-available')); });
+    if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
+  </script>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="speedlines"></div>
+  <div id="fever"></div>
+  <div id="vignette"></div>
+  <div id="flash"></div>
+
+  <!-- ===== HUD ===== -->
+  <div id="hud" class="hidden">
+    <div class="hud-top">
+      <div class="hud-left">
+        <div class="place-chip"><small>📍</small><b id="hud-place">Delhi Gate</b><i id="hud-tod" class="tod-chip subah"><span>🌅</span>Subah</i></div>
+        <div class="pill score">
+          <div class="score-row"><small>SCORE</small><i id="hud-mult" class="mult hidden">x1</i></div>
+          <b id="hud-score">0</b>
+          <span class="dist"><span class="dist-ic">📍</span><b id="hud-dist">0</b> m</span>
+        </div>
+      </div>
+      <div class="hud-mid">
+        <div id="hud-letters"></div>
+        <div id="hud-chase" class="hidden"><span>🚨 POLICE PEECHAY — BHAAG!</span><i><em id="chase-bar"></em></i></div>
+        <div id="hud-errand" class="hidden"></div>
+        <div id="hud-race" class="hidden"><span>🏍️ Billa Wheelie</span><b id="hud-race-gap">0m</b><i><em id="hud-race-bar"></em></i></div>
+        <div id="hud-mission" class="hidden">
+          <span id="hud-mission-text"></span><b id="hud-mission-time"></b>
+          <i><em id="hud-mission-bar"></em></i>
+        </div>
+      </div>
+      <div class="hud-right">
+        <div class="pill coins"><span class="coin-dot">Rs</span><b id="hud-coins">0</b></div>
+        <div id="hud-lives" class="pill lives"></div>
+        <button id="btn-pause" class="icon-btn" aria-label="Pause">❚❚</button>
+      </div>
+    </div>
+    <div class="hud-bottom">
+      <div id="hud-powers"></div>
+      <div class="nitro-wrap">
+        <div class="nitro-label">NITRO <small>Shift / N</small></div>
+        <div class="nitro-bar"><i id="hud-nitro"></i><span class="tick"></span></div>
+      </div>
+      <div id="speedo" class="speedo">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <defs><linearGradient id="sg" x1="0" x2="1"><stop offset="0" stop-color="#d4a23a"/><stop offset=".75" stop-color="#f3d27a"/><stop offset="1" stop-color="#d62828"/></linearGradient></defs>
+          <circle cx="60" cy="60" r="56" fill="rgba(20,6,10,.88)" stroke="#d4a23a" stroke-width="2"/>
+          <path d="M 23.6 81 A 42 42 0 1 1 96.4 81" fill="none" stroke="url(#sg)" stroke-width="5" stroke-linecap="round"/>
+          <g id="speedo-ticks"></g>
+        </svg>
+        <i id="speedo-needle"></i>
+        <div class="speedo-mid"><b id="hud-speed">0</b><small>km/h</small></div>
+        <div class="gear"><small>GEAR</small><b id="hud-gear">1</b></div>
+        <span id="speedo-limit" class="hidden"></span>
+      </div>
+    </div>
+    <div id="hud-boosts" class="hidden"></div>
+    <button id="hud-radio" class="radio-chip"><span id="radio-now">📻 Dhol FM 102</span><small>R — next</small></button>
+    <div id="touch-pad" class="hidden">
+      <button id="btn-horn" class="round">📯</button>
+      <button id="btn-wheelie" class="round wheelie">🏍️</button>
+      <button id="btn-nitro" class="round nitro">⚡</button>
+    </div>
+  </div>
+
+  <div id="siren"></div>
+  <div id="camflash"></div>
+  <div id="challan-prompt" class="hidden">
+    <b>📸 CHALLAN! Warden keh reha: RUKO!</b>
+    <span><kbd>↓</kbd> brake = ruk ke <em id="challan-fine">Rs 300</em> bharo · ya bhaag ja 🏍️💨</span>
+    <i><em id="challan-bar"></em></i>
+  </div>
+  <div id="challan-slip"></div>
+  <div id="popups"></div>
+  <div id="toast"></div>
+  <div id="bubble"><span id="bubble-text"></span></div>
+  <div id="district">
+    <small id="district-tag"></small>
+    <b id="district-name"></b>
+    <span id="district-urdu" lang="ur" dir="rtl"></span>
+    <em id="district-bonus"></em>
+  </div>
+
+  <!-- ===== Screens ===== -->
+  <section id="screen-loading" class="screen">
+    <div class="loader">
+      <img class="loader-logo" src="/logo.svg" alt="Lahore Rush" width="240" height="240" />
+      <p class="loader-urdu" lang="ur" dir="rtl">لاہور لاہور اے</p>
+      <div class="loader-bar"><i></i></div>
+      <p class="loader-text">Kick maar rahe aan… dug dug dug</p>
+    </div>
+  </section>
+
+  <div id="userbar" class="hidden">
+    <span id="user-hello"></span>
+    <button class="chip" id="btn-login">🔑 Login</button>
+    <button class="chip gold" id="btn-signup">✨ Sign up</button>
+    <button class="chip hidden" id="btn-profile">👤 Profile</button>
+    <button class="chip hidden" id="btn-logout">Logout</button>
+  </div>
+
+  <section id="screen-menu" class="screen hidden left">
+    <div class="panel glow-border menu-panel">
+      <img class="menu-logo" src="/logo.svg" alt="" width="150" height="150" />
+      <h1 class="sr-only">Lahore Rush</h1>
+      <p class="urdu-title" lang="ur" dir="rtl">لاہور لاہور اے</p>
+      <p class="tagline" id="menu-tip"></p>
+      <button class="btn big shimmer" data-act="play">▶ Kick maar bhaji!</button>
+      <div class="start-pick">
+        <button class="arrow" id="start-prev" aria-label="Previous location">◀</button>
+        <div><small>START · <span id="start-count"></span></small><b id="start-name">Delhi Gate</b></div>
+        <button class="arrow" id="start-next" aria-label="Next location">▶</button>
+      </div>
+      <div class="start-pick time-pick">
+        <button class="arrow" id="time-prev" aria-label="Previous time">◀</button>
+        <div><small>WAQT</small><b id="time-name">🌅 Subah</b></div>
+        <button class="arrow" id="time-next" aria-label="Next time">▶</button>
+      </div>
+      <div class="tiles">
+        <button class="tile" data-act="garage"><span>🛠️</span>Garage</button>
+        <button class="tile" data-act="challenges"><span>🏆</span>Challenges<i id="badge-ch" class="badge hidden">!</i></button>
+        <button class="tile" data-act="spin"><span>🎡</span>Lucky Spin<i id="badge-spin" class="badge hidden">1</i></button>
+        <button class="tile" data-act="radio"><span>📻</span>Radio</button>
+        <button class="tile" data-act="settings"><span>⚙️</span>Settings</button>
+        <button class="tile" data-act="howto"><span>❔</span>How to</button>
+      </div>
+      <div id="install-card" class="install-card hidden">
+        <div class="install-ic">📲</div>
+        <div class="install-txt"><b>Install Lahore Rush</b><small id="install-sub">Home screen ya desktop te — offline vi chalda ae, bilkul free.</small></div>
+        <button class="btn sm" id="btn-install">Install</button>
+      </div>
+      <div class="stats">
+        <div>Best <b id="menu-high">0</b></div>
+        <div>Wallet <b><span class="coin-dot sm">Rs</span> <span id="menu-coins">0</span></b><em id="menu-debt" class="debt hidden"></em></div>
+        <button class="link-btn" data-act="about"><i>i</i>About</button>
+      </div>
+    </div>
+  </section>
+
+  <footer id="credits-bar">
+    <span>Made in Pakistan <svg class="flag" viewBox="0 0 30 20" aria-label="Pakistan"><rect width="30" height="20" fill="#01411c"/><rect width="7.5" height="20" fill="#fff"/><circle cx="19" cy="10" r="5.2" fill="#fff"/><circle cx="20.4" cy="8.9" r="4.4" fill="#01411c"/><polygon points="22.6,6.2 23.1,7.6 24.6,7.6 23.4,8.5 23.9,9.9 22.6,9.0 21.4,9.9 21.9,8.5 20.6,7.6 22.1,7.6" fill="#fff"/></svg></span>
+    <span>Developer: <a href="https://muhammadtalhakhan2003.github.io/PortFolio_Talha/" target="_blank" rel="noopener">Muhammad Talha Khan ↗</a></span>
+    <em>Is game nu banande hoye koi 125 waala zakhmi nahi hoya — bas developer di neend te siri paye qurbaan hoye. 😴🍲</em>
+  </footer>
+
+  <section id="screen-garage" class="screen hidden right">
+    <div class="panel wide">
+      <h2>Garage</h2>
+      <div class="wallet"><span class="coin-dot">Rs</span><b id="garage-coins">0</b></div>
+      <div class="tabs">
+        <button class="tab active" data-tab="upgrades">Upgrades</button>
+        <button class="tab" data-tab="paint">Paint</button>
+        <button class="tab" data-tab="horn">Horn</button>
+        <button class="tab" data-tab="trail">Trails</button>
+        <button class="tab" data-tab="boosts">Boosts</button>
+      </div>
+      <div id="garage-list" class="list"></div>
+      <button class="btn" data-act="back">Done</button>
+    </div>
+  </section>
+
+  <section id="screen-challenges" class="screen hidden">
+    <div class="panel wide">
+      <h2>Challenges</h2>
+      <div class="label">Aaj ke challenges <small id="ch-reset"></small></div>
+      <div id="daily-list" class="list"></div>
+      <div class="label">Achievements</div>
+      <div id="ach-list" class="ach-grid"></div>
+      <div class="label">Top runs</div>
+      <ol id="leaderboard" class="board"></ol>
+      <button class="btn" data-act="back">Back</button>
+    </div>
+  </section>
+
+  <section id="screen-spin" class="screen hidden">
+    <div class="panel wide glow-border">
+      <h2>Lucky Spin 🎡</h2>
+      <p class="tagline" id="spin-note">Roz ik spin free — kismat aazma bhaji!</p>
+      <div class="wheel-wrap">
+        <div class="wheel-pin">▼</div>
+        <div id="wheel"></div>
+      </div>
+      <div id="spin-result" class="spin-result"></div>
+      <button class="btn big shimmer" id="btn-spin">Spin karo!</button>
+      <button class="btn" data-act="back">Back</button>
+    </div>
+  </section>
+
+  <section id="screen-radio" class="screen hidden">
+    <div class="panel wide glow-border">
+      <h2>Lahore Radio 📻</h2>
+      <div id="station-list" class="list"></div>
+      <div class="label">Meri Playlist <small>— apne gaane add karo (sirf aap ke browser mein save hote hain)</small></div>
+      <div id="song-list" class="list"></div>
+      <label class="btn file-btn">➕ Gaane add karo<input id="song-input" type="file" accept="audio/*" multiple hidden /></label>
+      <button class="btn" data-act="back">Done</button>
+    </div>
+  </section>
+
+  <section id="screen-about" class="screen hidden">
+    <div class="panel wide glow-border about">
+      <h2>About Lahore Rush</h2>
+      <p>The upgraded sequel to Rikshaw Rush: an endless 3D runner on a 125 through 37 real places of Lahore — from Delhi Gate and Gawalmandi to Anarkali, Minar-e-Pakistan, Canal Road and MM Alam Road. No place repeats until you've seen them all.</p>
+      <div class="label">Engineering highlights</div>
+      <ul class="tech">
+        <li><b>Blender-built hero models.</b> The 125 (spoked wheels, finned engine, crash guard, saree guard, rider in shalwar kameez), tonga, bhains, Minar-e-Pakistan and Badshahi Masjid are generated by a Python script in Blender and exported as glTF; the garage recolours their materials live.</li>
+        <li><b>Synthesised 4-stroke engine.</b> Every combustion pulse is scheduled in real time at rpm/120, so the exhaust note keeps its natural tone from the 11 Hz idle "dug-dug" to the 70 Hz top-gear "brrraap". It has a 4-speed box with throttle cut, clutch dip, gear clunk and downshift blip, plus kick-start, silencer crackle, wind, tyre and chain noise. No audio files.</li>
+        <li><b>Lahore law and order.</b> Speed cameras with traffic wardens, paper challans, and a police 125 that chases you with siren and lights if you don't stop.</li>
+        <li><b>Endless, never-repeating route.</b> Places are dealt like a shuffled deck, so no place repeats until all 37 have been visited and two neighbouring stretches never share a look.</li>
+        <li><b>Real road surface.</b> Procedural aggregate asphalt with a matching normal map, tyre-polished tracks, worn paint, black-and-yellow kerbs and cat's eyes that glow at night; it turns glossy in the rain.</li>
+        <li><b>Full day.</b> Subah, dopehar, shaam and raat roll by on every run: lit windows, street lamps, neon, headlights, monsoon rain and Lahore smog.</li>
+        <li><b>Curved-world shader + fair spawner.</b> A vertex bend makes the straight track sway over the horizon, and every obstacle has a fixed arrival distance, so an open lane is always guaranteed.</li>
+      </ul>
+      <div class="label">Stack</div>
+      <div class="chips"><span>Blender</span><span>Three.js</span><span>WebGL</span><span>GLSL</span><span>Web Audio</span><span>Vite</span><span>Clerk</span><span>IndexedDB</span><span>PWA</span><span>Vanilla JS</span></div>
+      <div class="credits big">
+        <span>Made in Pakistan <svg class="flag" viewBox="0 0 30 20" aria-label="Pakistan"><rect width="30" height="20" fill="#01411c"/><rect width="7.5" height="20" fill="#fff"/><circle cx="19" cy="10" r="5.2" fill="#fff"/><circle cx="20.4" cy="8.9" r="4.4" fill="#01411c"/><polygon points="22.6,6.2 23.1,7.6 24.6,7.6 23.4,8.5 23.9,9.9 22.6,9.0 21.4,9.9 21.9,8.5 20.6,7.6 22.1,7.6" fill="#fff"/></svg></span>
+        <span>Developer: <a href="https://muhammadtalhakhan2003.github.io/PortFolio_Talha/" target="_blank" rel="noopener">Muhammad Talha Khan ↗</a></span>
+        <em>Is game nu banande hoye koi 125 waala zakhmi nahi hoya — bas developer di neend te siri paye qurbaan hoye. 😴🍲</em>
+      </div>
+      <button class="btn" data-act="back">Back</button>
+    </div>
+  </section>
+
+  <section id="screen-settings" class="screen hidden">
+    <div class="panel wide">
+      <h2>Settings</h2>
+      <label class="setting">Volume <input id="set-volume" type="range" min="0" max="1" step="0.05" /></label>
+      <label class="setting">Music <input id="set-music" type="checkbox" /></label>
+      <label class="setting">Camera shake <input id="set-shake" type="checkbox" /></label>
+      <label class="setting">Graphics
+        <select id="set-quality"><option value="auto">Auto</option><option value="high">High (bloom)</option><option value="low">Low (fast)</option></select>
+      </label>
+      <div class="setting" id="account-row">Account <span id="account-state">Guest</span></div>
+      <button class="btn danger" id="btn-reset">Reset progress</button>
+      <button class="btn" data-act="back">Done</button>
+    </div>
+  </section>
+
+  <section id="screen-howto" class="screen hidden">
+    <div class="panel wide">
+      <h2>How to Play</h2>
+      <ul class="howto">
+        <li><kbd>←</kbd><kbd>→</kbd> / <kbd>A</kbd><kbd>D</kbd> / swipe — lane badlo (bike lean karti ae!)</li>
+        <li><kbd>↑</kbd> <kbd>W</kbd> <kbd>Space</kbd> / swipe up — jump (khadde, barriers)</li>
+        <li>Hawa vich jump dobara — <b>BACKFLIP</b> (+score, +nitro)</li>
+        <li><kbd>Q</kbd> <kbd>X</kbd> / 🏍️ — <b>WHEELIE</b>: jinni lambi, utne points te nitro</li>
+        <li><kbd>↓</kbd> <kbd>S</kbd> / swipe down — brake, wheelie khatam, ya hawa ton slam down</li>
+        <li><kbd>Shift</kbd> <kbd>N</kbd> / double-tap / ⚡ — <b>Nitro</b>: sab kuch tod de</li>
+        <li><kbd>H</kbd> / tap — horn: agli gaddi side te ho jandi ae (truck, bhains te naka nahi!)</li>
+        <li>🪁 <b>Basant kites</b> hawa vich latak rahiyan ne — jump ya ramp naal loot lo: BO KAATA!</li>
+        <li>👮 <b>Police naka</b> do lanes band karda ae — khulli lane labho</li>
+        <li>📸 <b>Speed camera</b>: limit sign dikhe ta <kbd>↓</kbd> brake naal speed ghatao. Limit ton tez = <b>challan</b>!</li>
+        <li>🚨 Challan = <b>aadhi kamai</b> da jurmana (jeb khaali ta <b>udhaar</b>, agli kamai ton katega). <kbd>↓</kbd> daba ke ruko — ya bhaago te <b>police 125</b> peechay! Nitro te near-miss naal chakma deo. Pakre gaye ta dil vi gaya ❤</li>
+        <li>📞 <b>Ammi da phone</b>: dahi, naan, doodh ya anday chukk lo — dua milegi. Reh gaya ta chappal 🩴</li>
+        <li>Near misses, kites te wheelies naal <b>combo</b> x6 tak — fer 🔥 <b>FEVER</b></li>
+        <li>Haath hilaundi <b>sawari</b>: kinare waali lane vich chukko, time te chhado</li>
+        <li>Power-ups: 🧲 Magnet · 🛡 Shield · 2x Coins · ⚡ Nitro · 🥛 Makhan Lassi</li>
+        <li>🔤 <b>L-A-H-O-R-E</b> letters jama karo — roz da jackpot Rs 2500!</li>
+        <li>🏍️ <b>Billa Wheelie</b> race lagaye ta usnu overtake karo</li>
+        <li>📍 37 jagah, koi do vaari nahi — har gate te navi jagah unlock</li>
+        <li>🌅 Menu ton <b>waqt</b> chuno: subah, dopehar, shaam ya raat</li>
+        <li><kbd>B</kbd> Headstart · <kbd>V</kbd> Shield Start · <kbd>R</kbd> radio · <kbd>P</kbd> pause · <kbd>M</kbd> mute</li>
+      </ul>
+      <button class="btn" data-act="back">Samajh gaya, chalo!</button>
+    </div>
+  </section>
+
+  <section id="screen-pause" class="screen hidden">
+    <div class="panel">
+      <h2>Paused</h2>
+      <p class="tagline">Chaa break! ☕ Doodh patti, kadak.</p>
+      <button class="btn big" data-act="resume">▶ Resume</button>
+      <button class="btn" data-act="settings">⚙ Settings</button>
+      <button class="btn" data-act="quit">Main Menu</button>
+    </div>
+  </section>
+
+  <section id="screen-gameover" class="screen hidden">
+    <div class="panel wide">
+      <h2>Siyapa Pe Gaya! 🏍️💥</h2>
+      <p class="tagline" id="go-line"></p>
+      <div class="final"><small>FINAL SCORE</small><b id="go-score">0</b><em id="go-new" class="hidden">🎉 New high score!</em></div>
+      <div class="stats grid">
+        <div>Distance <b id="go-distance">0 m</b></div>
+        <div>Coins earned <b id="go-coins">0</b></div>
+        <div>Passengers <b id="go-fares">0</b></div>
+        <div>Near misses <b id="go-near">0</b></div>
+        <div>Tricks <b id="go-tricks">0</b></div>
+        <div>Smashed <b id="go-smash">0</b></div>
+        <div>Races won <b id="go-rivals">0</b></div>
+        <div>Letters <b id="go-letters">0</b></div>
+        <div>Max speed <b id="go-speed">0</b></div>
+        <div>Kites looted <b id="go-kites">0</b></div>
+        <div>Wheelies <b id="go-wheelies">0</b></div>
+        <div>Reached <b id="go-place">—</b></div>
+        <div>Challans <b id="go-challans">0</b></div>
+        <div>Police escapes <b id="go-escapes">0</b></div>
+        <div>Ammi's errands <b id="go-errands">0</b></div>
+      </div>
+      <div id="go-debt" class="debt-line"></div>
+      <div id="go-unlocks"></div>
+      <button class="btn big gold hidden" id="btn-revive">❤ Continue — <span id="revive-cost">500</span> Rs</button>
+      <div class="row">
+        <button class="btn big" data-act="play">↻ Fer ton!</button>
+        <button class="btn big share" data-act="share">📤 Share</button>
+      </div>
+      <div class="row">
+        <button class="btn" data-act="garage">🛠 Garage</button>
+        <button class="btn" data-act="menu">Main Menu</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="confetti"></div>
+  <pre id="debug" class="hidden"></pre>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
