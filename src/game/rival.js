@@ -9,7 +9,8 @@ export class Rival {
   constructor(scene) {
     this.model = createBike(SKIN);
     this.model.root.visible = false;
-    this.model.head.intensity = 0;
+    // no headlight spot on the rival: every extra light makes every material in the scene more expensive
+    this.model.root.remove(this.model.head, this.model.head.target);
     scene.add(this.model.root);
     this.active = false;
     this.next = RIVAL.every[0];
@@ -59,7 +60,6 @@ export class Rival {
     for (const w of m.wheels) w.rotation.x -= rv * dt / 0.31;
     m.flame.visible = run.speed < rv;
     if (m.riderHead) m.riderHead.rotation.y = this.z < -6 && Math.sin(this.t * 1.1) > 0.4 ? -1.3 : 0;   // Billa looks back to taunt you
-    m.head.intensity = run.env.night * 30;
 
     if (this.z > 4) return this.finish('win');
     if (this.z < -150) return this.finish('lose');

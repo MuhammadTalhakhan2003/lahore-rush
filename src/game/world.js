@@ -12,6 +12,8 @@ import { createFlagLamp, createMinarFallback, createBadshahiFallback, createZamz
 import { createPedestrian } from '../models/person.js';
 
 const BEHIND = 34;
+const DEFER = Symbol('defer');
+const UNIQUE = /^(gate|flyover|underpass|badshahi|minar|zamzama)/; // named one-offs: always build the right one
 
 function createTile(d) {
   const b = new Builder();
@@ -64,7 +66,16 @@ export class World {
 
   take(key, make) {
     const list = this.pools.get(key);
-    const obj = list && list.length ? list.pop() : make();
+    let obj = list && list.length ? list.pop() : null;
+    if (!obj) {
+      // Building new scenery is the expensive part. While riding, spend at most a few ms per frame on it:
+      // borrow a pooled look-alike, or defer (the horizon is far ahead, so a deferred item never pops in late).
+      if (this.deadline && performance.now() > this.deadline && !UNIQUE.test(key)) {
+        const fam = key.replace(/\d+$/, '');
+        for (const [k, l] of this.pools) if (l.length && k !== key && k.replace(/\d+$/, '') === fam) { obj = l.pop(); break; }
+        if (!obj) throw DEFER;
+      } else obj = make();
+    }
     obj.userData.poolKey = key;
     this.root.add(obj);
     return obj;
@@ -263,10 +274,12 @@ export class World {
     }
   }
 
-  update(D, dt = 0) {
+  update(D, dt = 0, budgetMs = 3) {
     this.D = D;
     this.time += dt;
-    this.fill();
+    this.deadline = performance.now() + budgetMs;
+    try { this.fill(); } catch (e) { if (e !== DEFER) throw e; }
+    this.deadline = 0;
     const items = this.items;
     for (let i = items.length - 1; i >= 0; i--) {
       const it = items[i];

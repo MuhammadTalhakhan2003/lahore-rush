@@ -4,7 +4,7 @@ import { Builder, pick, rand } from '../render/kit.js';
 import { artUV } from '../render/textures.js';
 import { addSeated, randomLook } from './person.js';
 import { customModel } from '../render/gltf.js';
-import { createRickshaw } from './rickshaw.js';
+import { createTrafficRickshawModel } from './rickshaw.js';
 import * as THREE from 'three';
 
 const GLASS = 0x1e2a36, DARK = 0x151515, CHROME = 0xcfcfcf;
@@ -224,12 +224,7 @@ export function createChingchi() {
 
 /** Traffic auto-rickshaw (Blender model if present). */
 export function createTrafficRickshaw() {
-  const c = customModel('rickshaw');
-  if (c) return { group: c.group, hw: 0.8, hl: 1.4, h: 2.2 };
-  const skins = [{ body: 0x1b7f3b, canopy: 0x1a1a1a, trim: 0xffd60a, stripe: [0xd62828, 0xffd60a] }, { body: 0xc81d25, canopy: 0x262626, trim: 0xf5f5f5, stripe: [0xffd60a, 0xffffff] }];
-  const r = createRickshaw(pick(skins));
-  r.head.intensity = 0;
-  return { group: r.root, hw: 0.8, hl: 1.4, h: 2.2 };
+  return { group: createTrafficRickshawModel(), hw: 0.8, hl: 1.4, h: 2.2 };
 }
 
 /** Tonga (horse cart) — Blender model if present, simple fallback otherwise. */

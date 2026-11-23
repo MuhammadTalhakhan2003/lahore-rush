@@ -4,11 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#2a0a0e" />
-  <meta name="description" content="Lahore Rush — a 3D endless 125 bike runner through 37 real places of Lahore. Wheelies, backflips, Basant kites and Lahori swag." />
+  <meta name="description" content="Lahore Rush — a 3D endless runner through 37 real places of Lahore on a 125 or an auto-rickshaw. Wheelies, two-wheel rickshaw stunts, backflips, Basant kites and Lahori swag." />
   <title>Lahore Rush</title>
   <meta property="og:type" content="website" />
   <meta property="og:title" content="Lahore Rush — 125 te poora Lahore, browser vich" />
-  <meta property="og:description" content="Ride a 125 through Delhi Gate, Anarkali, Minar-e-Pakistan, Canal Road and MM Alam Road. Endless, free, no install." />
+  <meta property="og:description" content="Ride a 125 or a rickshaw through Delhi Gate, Anarkali, Minar-e-Pakistan, Canal Road and MM Alam Road. Endless, free, no install." />
   <meta property="og:url" content="https://lahore-rush.vercel.app/" />
   <meta property="og:image" content="https://lahore-rush.vercel.app/og.png" />
   <meta property="og:image:width" content="1200" />
@@ -51,7 +51,6 @@
       </div>
       <div class="hud-mid">
         <div id="hud-letters"></div>
-        <div id="hud-chase" class="hidden"><span>🚨 POLICE PEECHAY — BHAAG!</span><i><em id="chase-bar"></em></i></div>
         <div id="hud-errand" class="hidden"></div>
         <div id="hud-race" class="hidden"><span>🏍️ Billa Wheelie</span><b id="hud-race-gap">0m</b><i><em id="hud-race-bar"></em></i></div>
         <div id="hud-mission" class="hidden">
@@ -73,34 +72,35 @@
       </div>
       <div id="speedo" class="speedo">
         <svg viewBox="0 0 120 120" aria-hidden="true">
-          <defs><linearGradient id="sg" x1="0" x2="1"><stop offset="0" stop-color="#d4a23a"/><stop offset=".75" stop-color="#f3d27a"/><stop offset="1" stop-color="#d62828"/></linearGradient></defs>
-          <circle cx="60" cy="60" r="56" fill="rgba(20,6,10,.88)" stroke="#d4a23a" stroke-width="2"/>
-          <path d="M 23.6 81 A 42 42 0 1 1 96.4 81" fill="none" stroke="url(#sg)" stroke-width="5" stroke-linecap="round"/>
-          <g id="speedo-ticks"></g>
+          <defs>
+            <linearGradient id="sg" x1="0" y1="1" x2="1" y2="1"><stop offset="0" stop-color="#f3d27a"/><stop offset=".65" stop-color="#ff9a3c"/><stop offset="1" stop-color="#ff3b3b"/></linearGradient>
+            <radialGradient id="sface" cx=".5" cy=".42" r=".6"><stop offset="0" stop-color="#3a1018"/><stop offset="1" stop-color="#14060a"/></radialGradient>
+          </defs>
+          <circle cx="60" cy="60" r="57" fill="url(#sface)" stroke="#d4a23a" stroke-width="1.6"/>
+          <circle cx="60" cy="60" r="52.5" fill="none" stroke="rgba(243,210,122,.18)" stroke-width=".8"/>
+          <g stroke="rgba(255,240,210,.45)" stroke-width="1.6" stroke-linecap="round">
+            <line x1="60" y1="9.5" x2="60" y2="13.5" transform="rotate(-120 60 60)"/><line x1="60" y1="9.5" x2="60" y2="13.5" transform="rotate(-80 60 60)"/>
+            <line x1="60" y1="9.5" x2="60" y2="13.5" transform="rotate(-40 60 60)"/><line x1="60" y1="9.5" x2="60" y2="13.5"/>
+            <line x1="60" y1="9.5" x2="60" y2="13.5" transform="rotate(40 60 60)"/><line x1="60" y1="9.5" x2="60" y2="13.5" transform="rotate(80 60 60)"/>
+            <line x1="60" y1="9.5" x2="60" y2="13.5" transform="rotate(120 60 60)"/>
+          </g>
+          <path d="M 21.9 82 A 44 44 0 1 1 98.1 82" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="7" stroke-linecap="round"/>
+          <path id="speedo-arc" d="M 21.9 82 A 44 44 0 1 1 98.1 82" fill="none" stroke="url(#sg)" stroke-width="7" stroke-linecap="round" pathLength="100" stroke-dasharray="0 100"/>
+          <g id="speedo-tip" transform="rotate(-120 60 60)"><circle cx="60" cy="16" r="5.2" fill="#fff" stroke="#ff9a3c" stroke-width="2"/></g>
         </svg>
-        <i id="speedo-needle"></i>
-        <div class="speedo-mid"><b id="hud-speed">0</b><small>km/h</small></div>
-        <div class="gear"><small>GEAR</small><b id="hud-gear">1</b></div>
-        <span id="speedo-limit" class="hidden"></span>
+        <div class="speedo-mid"><b id="hud-speed">0</b><small>KM/H</small></div>
+        <div class="gear"><small>G</small><b id="hud-gear">1</b></div>
       </div>
     </div>
     <div id="hud-boosts" class="hidden"></div>
     <button id="hud-radio" class="radio-chip"><span id="radio-now">📻 Dhol FM 102</span><small>R — next</small></button>
     <div id="touch-pad" class="hidden">
-      <button id="btn-horn" class="round">📯</button>
-      <button id="btn-wheelie" class="round wheelie">🏍️</button>
-      <button id="btn-nitro" class="round nitro">⚡</button>
+      <button id="btn-horn" class="round horn" aria-label="Horn">📯</button>
+      <button id="btn-wheelie" class="round wheelie" aria-label="Stunt">🏍️</button>
+      <button id="btn-nitro" class="round nitro" aria-label="Nitro"><span>⚡</span></button>
     </div>
   </div>
 
-  <div id="siren"></div>
-  <div id="camflash"></div>
-  <div id="challan-prompt" class="hidden">
-    <b>📸 CHALLAN! Warden keh reha: RUKO!</b>
-    <span><kbd>↓</kbd> brake = ruk ke <em id="challan-fine">Rs 300</em> bharo · ya bhaag ja 🏍️💨</span>
-    <i><em id="challan-bar"></em></i>
-  </div>
-  <div id="challan-slip"></div>
   <div id="popups"></div>
   <div id="toast"></div>
   <div id="bubble"><span id="bubble-text"></span></div>
@@ -135,7 +135,12 @@
       <h1 class="sr-only">Lahore Rush</h1>
       <p class="urdu-title" lang="ur" dir="rtl">لاہور لاہور اے</p>
       <p class="tagline" id="menu-tip"></p>
-      <button class="btn big shimmer" data-act="play">▶ Kick maar bhaji!</button>
+      <button class="btn big shimmer" data-act="play" id="btn-play">▶ Kick maar bhaji!</button>
+      <div class="ride-pick" role="radiogroup" aria-label="Sawari">
+        <button data-ride="bike" role="radio"><span>🏍️</span><b>125</b><small>Wheelie · backflip</small></button>
+        <button data-ride="rickshaw" role="radio"><span>🛺</span><b>Rickshaw</b><small>Do pahiya stunt</small></button>
+      </div>
+      <div class="pick-row">
       <div class="start-pick">
         <button class="arrow" id="start-prev" aria-label="Previous location">◀</button>
         <div><small>START · <span id="start-count"></span></small><b id="start-name">Delhi Gate</b></div>
@@ -145,6 +150,7 @@
         <button class="arrow" id="time-prev" aria-label="Previous time">◀</button>
         <div><small>WAQT</small><b id="time-name">🌅 Subah</b></div>
         <button class="arrow" id="time-next" aria-label="Next time">▶</button>
+      </div>
       </div>
       <div class="tiles">
         <button class="tile" data-act="garage"><span>🛠️</span>Garage</button>
@@ -161,7 +167,7 @@
       </div>
       <div class="stats">
         <div>Best <b id="menu-high">0</b></div>
-        <div>Wallet <b><span class="coin-dot sm">Rs</span> <span id="menu-coins">0</span></b><em id="menu-debt" class="debt hidden"></em></div>
+        <div>Wallet <b><span class="coin-dot sm">Rs</span> <span id="menu-coins">0</span></b></div>
         <button class="link-btn" data-act="about"><i>i</i>About</button>
       </div>
     </div>
@@ -230,12 +236,13 @@
   <section id="screen-about" class="screen hidden">
     <div class="panel wide glow-border about">
       <h2>About Lahore Rush</h2>
-      <p>The upgraded sequel to Rikshaw Rush: an endless 3D runner on a 125 through 37 real places of Lahore — from Delhi Gate and Gawalmandi to Anarkali, Minar-e-Pakistan, Canal Road and MM Alam Road. No place repeats until you've seen them all.</p>
+      <p>The upgraded sequel to Rikshaw Rush: an endless 3D runner on a 125 or an auto-rickshaw through 37 real places of Lahore — from Delhi Gate and Gawalmandi to Anarkali, Minar-e-Pakistan, Canal Road and MM Alam Road. No place repeats until you've seen them all.</p>
       <div class="label">Engineering highlights</div>
       <ul class="tech">
         <li><b>Blender-built hero models.</b> The 125 (spoked wheels, finned engine, crash guard, saree guard, rider in shalwar kameez), tonga, bhains, Minar-e-Pakistan and Badshahi Masjid are generated by a Python script in Blender and exported as glTF; the garage recolours their materials live.</li>
         <li><b>Synthesised 4-stroke engine.</b> Every combustion pulse is scheduled in real time at rpm/120, so the exhaust note keeps its natural tone from the 11 Hz idle "dug-dug" to the 70 Hz top-gear "brrraap". It has a 4-speed box with throttle cut, clutch dip, gear clunk and downshift blip, plus kick-start, silencer crackle, wind, tyre and chain noise. No audio files.</li>
-        <li><b>Lahore law and order.</b> Speed cameras with traffic wardens, paper challans, and a police 125 that chases you with siren and lights if you don't stop.</li>
+        <li><b>Two rides.</b> A leaning 125 with wheelies, or an auto-rickshaw with soft springs, a raspy 2-stroke engine and a two-wheel "do pahiya" stunt.</li>
+        <li><b>Built to run smooth on phones.</b> Blender models are merged at load into a few draw calls, the curved world is culled on the CPU, every shader is compiled behind the loading screen, and the render scale adapts to hold 60 fps.</li>
         <li><b>Endless, never-repeating route.</b> Places are dealt like a shuffled deck, so no place repeats until all 37 have been visited and two neighbouring stretches never share a look.</li>
         <li><b>Real road surface.</b> Procedural aggregate asphalt with a matching normal map, tyre-polished tracks, worn paint, black-and-yellow kerbs and cat's eyes that glow at night; it turns glossy in the rain.</li>
         <li><b>Full day.</b> Subah, dopehar, shaam and raat roll by on every run: lit windows, street lamps, neon, headlights, monsoon rain and Lahore smog.</li>
@@ -271,17 +278,17 @@
     <div class="panel wide">
       <h2>How to Play</h2>
       <ul class="howto">
+        <li>🏍️ <b>125</b> ya 🛺 <b>Rickshaw</b> — menu ton sawari chuno</li>
         <li><kbd>←</kbd><kbd>→</kbd> / <kbd>A</kbd><kbd>D</kbd> / swipe — lane badlo (bike lean karti ae!)</li>
         <li><kbd>↑</kbd> <kbd>W</kbd> <kbd>Space</kbd> / swipe up — jump (khadde, barriers)</li>
         <li>Hawa vich jump dobara — <b>BACKFLIP</b> (+score, +nitro)</li>
-        <li><kbd>Q</kbd> <kbd>X</kbd> / 🏍️ — <b>WHEELIE</b>: jinni lambi, utne points te nitro</li>
+        <li><kbd>Q</kbd> <kbd>X</kbd> / 🏍️ — <b>WHEELIE</b> (125) ya <b>DO PAHIYA</b> (rickshaw do pahiyan te): jinna lamba, utne points te nitro</li>
+        <li>😱 Gaddi de bilkul kol ton nikal — <b>slow-motion</b> te bonus!</li>
+        <li>🏁 Sadak te <b>TERA RECORD</b> da gate — usnu cross kar ke record tod!</li>
         <li><kbd>↓</kbd> <kbd>S</kbd> / swipe down — brake, wheelie khatam, ya hawa ton slam down</li>
         <li><kbd>Shift</kbd> <kbd>N</kbd> / double-tap / ⚡ — <b>Nitro</b>: sab kuch tod de</li>
         <li><kbd>H</kbd> / tap — horn: agli gaddi side te ho jandi ae (truck, bhains te naka nahi!)</li>
         <li>🪁 <b>Basant kites</b> hawa vich latak rahiyan ne — jump ya ramp naal loot lo: BO KAATA!</li>
-        <li>👮 <b>Police naka</b> do lanes band karda ae — khulli lane labho</li>
-        <li>📸 <b>Speed camera</b>: limit sign dikhe ta <kbd>↓</kbd> brake naal speed ghatao. Limit ton tez = <b>challan</b>!</li>
-        <li>🚨 Challan = <b>aadhi kamai</b> da jurmana (jeb khaali ta <b>udhaar</b>, agli kamai ton katega). <kbd>↓</kbd> daba ke ruko — ya bhaago te <b>police 125</b> peechay! Nitro te near-miss naal chakma deo. Pakre gaye ta dil vi gaya ❤</li>
         <li>📞 <b>Ammi da phone</b>: dahi, naan, doodh ya anday chukk lo — dua milegi. Reh gaya ta chappal 🩴</li>
         <li>Near misses, kites te wheelies naal <b>combo</b> x6 tak — fer 🔥 <b>FEVER</b></li>
         <li>Haath hilaundi <b>sawari</b>: kinare waali lane vich chukko, time te chhado</li>
@@ -307,33 +314,31 @@
   </section>
 
   <section id="screen-gameover" class="screen hidden">
-    <div class="panel wide">
-      <h2>Siyapa Pe Gaya! 🏍️💥</h2>
+    <div class="panel wide go-panel">
+      <h2 id="go-title">Siyapa Pe Gaya! 🏍️💥</h2>
       <p class="tagline" id="go-line"></p>
       <div class="final"><small>FINAL SCORE</small><b id="go-score">0</b><em id="go-new" class="hidden">🎉 New high score!</em></div>
+      <div id="go-best" class="best-line"><span id="go-best-text"></span><i><em id="go-best-bar"></em></i></div>
+      <div id="go-unlocks"></div>
+      <button class="btn big gold hidden" id="btn-revive">❤ Continue — <span id="revive-cost">500</span> Rs</button>
+      <div class="row go-main">
+        <button class="btn big" data-act="play">↻ Fer ton!</button>
+        <button class="btn big share" data-act="share">📤 Share</button>
+      </div>
       <div class="stats grid">
         <div>Distance <b id="go-distance">0 m</b></div>
         <div>Coins earned <b id="go-coins">0</b></div>
+        <div>Reached <b id="go-place">—</b></div>
         <div>Passengers <b id="go-fares">0</b></div>
         <div>Near misses <b id="go-near">0</b></div>
         <div>Tricks <b id="go-tricks">0</b></div>
+        <div>Stunts <b id="go-wheelies">0</b></div>
         <div>Smashed <b id="go-smash">0</b></div>
         <div>Races won <b id="go-rivals">0</b></div>
+        <div>Kites looted <b id="go-kites">0</b></div>
         <div>Letters <b id="go-letters">0</b></div>
         <div>Max speed <b id="go-speed">0</b></div>
-        <div>Kites looted <b id="go-kites">0</b></div>
-        <div>Wheelies <b id="go-wheelies">0</b></div>
-        <div>Reached <b id="go-place">—</b></div>
-        <div>Challans <b id="go-challans">0</b></div>
-        <div>Police escapes <b id="go-escapes">0</b></div>
         <div>Ammi's errands <b id="go-errands">0</b></div>
-      </div>
-      <div id="go-debt" class="debt-line"></div>
-      <div id="go-unlocks"></div>
-      <button class="btn big gold hidden" id="btn-revive">❤ Continue — <span id="revive-cost">500</span> Rs</button>
-      <div class="row">
-        <button class="btn big" data-act="play">↻ Fer ton!</button>
-        <button class="btn big share" data-act="share">📤 Share</button>
       </div>
       <div class="row">
         <button class="btn" data-act="garage">🛠 Garage</button>
@@ -343,6 +348,7 @@
   </section>
 
   <div id="confetti"></div>
+  <div id="glyph-warm" aria-hidden="true">◀▶❚❤♡🏍️🛺⚡📯🧲🛡️🥛🪁🏆😱🔥💪🎉📍🌅☀️🌇🌙🐾🐕🐈‍⬛📞🩴🥣🫓🥚✋😵🫨💨🌑🤲😎⏩</div>
   <pre id="debug" class="hidden"></pre>
   <script type="module" src="/src/main.js"></script>
 </body>

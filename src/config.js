@@ -125,8 +125,6 @@ export const BOOSTS = [
 export const RIVAL = { name: 'Billa Wheelie', every: [900, 1500], reward: 200 };
 export const WHEELIE = { max: 3.2, cooldown: 1.2, pointsPerSec: 260 };
 export const KITE = { every: [140, 260], coins: 25, points: 300 };
-// Speed cameras + traffic wardens. Over the limit at the camera = challan; don't stop = police chase.
-export const CHALLAN = { every: [850, 1300], limits: [60, 80, 100, 120, 140], fine: 300, tolerance: 6, stopWindow: 3.4, startGap: 16, escapeGap: 30, chaseTime: 20 };
 // "Ammi da phone" errands: grab the item before the distance runs out.
 export const ERRANDS = [
   { id: 'dahi', name: 'Dahi', icon: '🥣', ask: 'Puttar, wapsi te dahi lai aana — raita banana ae!' },
@@ -223,21 +221,6 @@ export const LINES = {
   ],
   rivalWin: ['Billa: "Oye hoye, tu ta ustaad nikleya!"', 'Billa: "Chal theek ae, is vaari tera din si..."'],
   rivalLose: ['Billa: "Bye bye kakka! Fer koshish kari!"', 'Billa nikal gaya — siyapa pe gaya!'],
-  naka: ['Naka lagya ae! Kaghzaat taiyar rakh bhaji!', 'Police da naka — khulli lane labh!'],
-  speedSign: ['Speed limit {l}! Camera agge ae — brake maar!', 'Oye {l} di limit ae, warden khalota ae agge!'],
-  stopPlease: ['Warden: "Oye 125 waale! Side te la!"', 'Warden: "Rukk ja puttar, challan hona!"', 'Warden: "Seeti sunayi nahi dindi? RUKO!"'],
-  stopped: ['Saab ji, ammi bimar ne, dawai lain chaleya si!', 'Sir ji galti ho gayi, aidda kade nahi karaanga!', 'Saab ji, Rs 300? Mahina abhi shuru hoya ae...'],
-  slip: [
-    'Puttar, 125 ae, jahaz nahi.',
-    'Helmet vi pa lia karo, sohne lagde o.',
-    'Speed naal nahi, pyaar naal chalao.',
-    'Sultan Rahi banan da shauq ghar rakh ke aao.',
-    'Agli vaari licence vi naal lai ke aana.',
-    'Ammi nu dasaan? Nahi na? Fer hauli chalao.',
-  ],
-  chaseStart: ['🚨 Police peechay lag gayi! Bhaag bhaji bhaag!', '🚨 "Wireless te dasso — chitta kurta, laal 125!"'],
-  caught: ['Police: "Kaghzaat? Licence? Helmet? Teeno ghaib!"', 'Police: "Bas puttar, hun thane chal ke chaa peeni ae."', 'Police: "Ammi da number deo, unhaan nu dasiye."'],
-  escaped: ['Police nu chakma de ditta! Oye hoye!', '"Oh nikal gaya... agli vaari pakkan ga!" — police waala', 'Gali vich mur ke gayab! Lahori jugaad!'],
   ammiHappy: ['Ammi: "Jeenda reh puttar! Allah lambi umar deve!" 🤲', 'Ammi: "Mera sohna puttar! Rotti tayar ae."'],
   ammiAngry: ['Ammi: "Ghar aa zara, chappal tayar ae!" 🩴', 'Ammi: "Ik kam keha si, oh vi nahi hoya!"'],
   gameOver: [
@@ -257,6 +240,7 @@ export const SHOUTS = {
   trick: ['BACKFLIP!', 'LAHORE LAHORE AE!', 'HAWA VICH!'],
   smash: ['DHAMAKA!', 'BHAJI KAMAAL!', 'TOD DITTA!'],
   wheelie: ['IK PAHIYA!', 'WHEELIE KING!', 'OYE HOYE WHEELIE!'],
+  tilt: ['DO PAHIYE TE!', 'RICKSHAW STUNT!', 'OYE HOYE BALANCE!', 'CHINGCHI KING!'],
   kite: ['BO KAATA! 🪁', 'PATANG LOOT LI!', 'BASANT! 🪁'],
 };
 
@@ -272,7 +256,6 @@ export const TIPS = [
   'Billa Wheelie race lagaye ta nitro bacha ke rakh!',
   'Delhi Gate ton DHA tak — 37 jagah, koi jagah do vaari nahi! Poora Lahore ghoom!',
   'Makhan Lassi pee — coins khud kheench ke aande ne, te thori hifazat vi!',
-  'Police naka aaye ta khulli lane labh — kaghzaat baad vich!',
 ];
 
 // Wall posters & chalking (original designs): [headline, sub, bg, fg]

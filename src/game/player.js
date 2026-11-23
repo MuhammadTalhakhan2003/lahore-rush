@@ -1,20 +1,29 @@
-// Player 125: lane switching with a proper lean, jumps, ramp launches, backflips, wheelies, braking.
+// The player's ride — a 125 or an auto-rickshaw: lane switching, jumps, ramp launches, backflips, braking,
+// and a signature stunt: the 125 pulls a WHEELIE, the rickshaw goes up on two wheels (DO PAHIYA).
 import { LANES, WHEELIE } from '../config.js';
 import { createBike } from '../models/bike.js';
+import { createRickshaw } from '../models/rickshaw.js';
 
 const G = 28, JUMP_V = 9, RAMP_V = 13.5;
 const TAU = Math.PI * 2;
 
 export class Player {
-  constructor(scene, skin) {
+  constructor(scene, skin, vehicle = 'bike') {
     this.scene = scene;
+    this.vehicle = vehicle;
+    this.tiltSide = 1;
     this.setSkin(skin);
     this.reset();
   }
 
+  get isRickshaw() { return this.vehicle === 'rickshaw'; }
+
+  setVehicle(vehicle, skin) { this.vehicle = vehicle; this.setSkin(skin); }
+
   setSkin(skin) {
     const prev = this.model;
-    this.model = createBike(skin);
+    this.skin = skin;
+    this.model = this.isRickshaw ? createRickshaw(skin) : createBike(skin);
     if (prev) {
       this.model.root.position.copy(prev.root.position);
       this.model.passenger.visible = prev.passenger.visible;
@@ -66,6 +75,7 @@ export class Player {
   wheelie() {
     if (!this.grounded || this.wheelieOn || this.wheelieCD > 0) return false;
     this.wheelieOn = true; this.wheelieT = 0;
+    this.tiltSide = this.x > 0.5 ? -1 : this.x < -0.5 ? 1 : -this.tiltSide;   // lift the side away from the kerb
     this.events.push('wheelieStart');
     return true;
   }
@@ -125,16 +135,24 @@ export class Player {
 
     // ---- visuals ----
     const m = this.model;
-    // a bike leans INTO the lane change (and a little with the road's sway)
-    const leanTarget = Math.max(-0.5, Math.min(0.5, -dx * 0.16)) + Math.sin(this.time * 0.7) * 0.015;
+    const rick = this.isRickshaw;
+    // a bike leans INTO the lane change; a rickshaw's body rolls a little the other way on its soft springs
+    const leanTarget = rick
+      ? Math.max(-0.12, Math.min(0.12, dx * 0.05)) + Math.sin(this.time * 0.9) * 0.008
+      : Math.max(-0.5, Math.min(0.5, -dx * 0.16)) + Math.sin(this.time * 0.7) * 0.015;
     this.roll += (leanTarget - this.roll) * Math.min(1, dt * 9);
+    // DO PAHIYA: the rickshaw rides up on the two wheels of one side, pivoting on them
+    const sideTarget = rick && this.wheelieOn ? 0.42 + Math.sin(this.time * 6) * 0.05 : 0;
+    this.sideA = (this.sideA || 0) + (sideTarget - (this.sideA || 0)) * Math.min(1, dt * 8);
+    const th = -this.tiltSide * this.sideA;
     m.root.position.set(this.x, this.y, 0);
-    m.tilt.rotation.z = this.roll;
-    m.tilt.rotation.y = -dx * 0.05;
-    m.tilt.position.y = this.grounded ? Math.abs(Math.sin(this.time * 19)) * 0.012 : 0;
+    m.tilt.rotation.z = this.roll + th;
+    m.tilt.rotation.y = -dx * (rick ? 0.035 : 0.05);
+    const rumble = this.grounded ? Math.abs(Math.sin(this.time * (rick ? 23 : 19))) * (rick ? 0.018 : 0.012) : 0;
+    m.tilt.position.set(this.tiltSide * 0.72 * (1 - Math.cos(th)), 0.72 * Math.abs(Math.sin(th)) + rumble, 0);
     // wheelie wobble on the rear axle; nose up when rising in the air; dive under braking
     let pt = 0;
-    if (this.wheelieOn) pt = 0.52 + Math.sin(this.time * 7) * 0.06;
+    if (this.wheelieOn && !rick) pt = 0.52 + Math.sin(this.time * 7) * 0.06;
     else if (!this.grounded) pt = Math.max(-0.2, Math.min(0.3, this.vy * 0.025));
     else if (this.brake > 0) pt = -0.05;
     this.pitchA += (pt - this.pitchA) * Math.min(1, dt * (this.wheelieOn ? 6 : 10));
@@ -142,7 +160,6 @@ export class Player {
     m.flip.rotation.x = this.spinning ? this.spin : 0;
     if (m.riderHead) {
       let yaw = -dx * 0.28;
-      if (this.lookBack) yaw = Math.sin(this.time * 1.3) > 0.2 ? 1.25 : yaw;   // nervous glances at the police
       this.headYaw = (this.headYaw || 0) + (yaw - (this.headYaw || 0)) * Math.min(1, dt * 6);
       m.riderHead.rotation.y = this.headYaw;
       m.riderHead.rotation.x = this.wheelieOn ? -0.2 : 0;
@@ -157,5 +174,5 @@ export class Player {
     m.root.visible = this.blink <= 0 || Math.floor(this.blink * 14) % 2 === 0;
   }
 
-  get box() { return { x: this.x, y: this.y, hw: 0.5, hl: 1.0 }; }
+  get box() { return this.isRickshaw ? { x: this.x, y: this.y, hw: 0.68, hl: 1.3 } : { x: this.x, y: this.y, hw: 0.5, hl: 1.0 }; }
 }

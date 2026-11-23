@@ -9,15 +9,15 @@ import { LANES, SPEED, DISTRICT_LENGTH, placeAt, POWERUPS, LINES, SHOUTS, LETTER
 import { save, persist } from '../core/save.js';
 import { audio } from '../core/audio.js';
 import { checkLive } from '../core/challenges.js';
-import { pick, rand, randi } from '../render/kit.js';
+import { pick, rand, randi, Builder } from '../render/kit.js';
 import { createCar, createVan, createTruck, createBus, createBaraat, createChingchi, createTrafficRickshaw, createTonga, createDoodhWala, createScooter, createMetroBus, createDog, createCat } from '../models/vehicles.js';
 import { createTrafficBike } from '../models/bike.js';
 import { createKitePickup } from '../models/landmarks.js';
 import { Rival } from './rival.js';
-import { Law } from './challan.js';
 import { Errands } from './errands.js';
 import { customModel } from '../render/gltf.js';
-import { createPothole, createBarrier, createRamp, createPuddle, createPowerup, createBeacon, createLetter, createBreaker, createManhole, createRoughPatch, createNaka } from '../models/props.js';
+import { curvify } from '../render/curve.js';
+import { createPothole, createBarrier, createRamp, createPuddle, createPowerup, createBeacon, createLetter, createBreaker, createManhole, createRoughPatch } from '../models/props.js';
 import { createStanding, randomLook } from '../models/person.js';
 
 const TYPES = {
@@ -26,7 +26,7 @@ const TYPES = {
   truck: { make: createTruck, f: 0.74, hard: true, variants: 4, vehicle: true, heavy: true },
   bus: { make: createBus, f: 0.74, hard: true, variants: 4, vehicle: true, heavy: true },
   bike: { make: createTrafficBike, f: 0.55, hard: true, variants: 5, vehicle: true },
-  rickshaw: { make: createTrafficRickshaw, f: 0.6, hard: true, variants: 2, vehicle: true },
+  rickshaw: { make: createTrafficRickshaw, f: 0.6, hard: true, variants: 5, vehicle: true },
   chingchi: { make: createChingchi, f: 0.66, hard: true, variants: 4, vehicle: true },
   tonga: { make: createTonga, f: 0.84, hard: true, variants: 2, vehicle: true },
   dog: { make: createDog, f: 1, hard: true, variants: 5, animal: true, noSmash: true, cross: 0.09, trot: 11 },
@@ -34,7 +34,6 @@ const TYPES = {
   doodh: { make: createDoodhWala, f: 0.5, hard: true, variants: 3, vehicle: true },
   scooter: { make: createScooter, f: 0.58, hard: true, variants: 5, vehicle: true },
   metro: { make: createMetroBus, f: 0.74, hard: true, variants: 1, vehicle: true, heavy: true },
-  naka: { make: createNaka, f: 1, hard: true, variants: 2, noSmash: true },
   baraat: { make: createBaraat, f: 0.88, hard: true, variants: 3, noSmash: true },
   pothole: { make: createPothole, f: 1, jump: true, variants: 3, flat: true },
   barrier: { make: createBarrier, f: 1, jump: true, variants: 2 },
@@ -59,6 +58,39 @@ const HORIZON = 360;      // spawn rows this far ahead (route metres)
 const P_HL = 1.35, P_HW = 0.72;
 const lerp = (a, b, t) => a + (b - a) * t;
 const _v = new THREE.Vector3();
+const buzz = ms => { try { navigator.vibrate?.(ms); } catch { /* not supported */ } };
+
+/** "TERA RECORD" finish arch, parked on the road at your best distance. */
+function createRecordArch() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024; canvas.height = 192;
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const mat = curvify(new THREE.MeshBasicMaterial({ map: tex, toneMapped: false, side: THREE.DoubleSide }));
+  const group = new THREE.Group();
+  const banner = new THREE.Mesh(new THREE.PlaneGeometry(9.8, 1.85), mat);
+  banner.position.y = 5.3; banner.frustumCulled = false;
+  const b = new Builder();
+  for (const s of [-1, 1]) {
+    b.box(0.32, 6.2, 0.32, 0xd4a23a, s * 5.1, 3.1, 0, { kind: 'shiny' });
+    b.sphere(0.32, 0xffd60a, s * 5.1, 6.4, 0, { kind: 'glow' });
+  }
+  for (let i = 0; i < 16; i++) for (let r = 0; r < 2; r++) b.box(0.6, 0.02, 0.6, (i + r) % 2 ? 0x111111 : 0xf5f5f5, -4.5 + i * 0.6, 0.03, -0.3 + r * 0.6);
+  group.add(b.build(), banner);
+  group.userData.noCull = true;
+  group.visible = false;
+  const draw = meters => {
+    const g = canvas.getContext('2d'), w = canvas.width, h = canvas.height;
+    const grd = g.createLinearGradient(0, 0, 0, h); grd.addColorStop(0, '#8b1a1a'); grd.addColorStop(1, '#3a0d0d');
+    g.fillStyle = grd; g.fillRect(0, 0, w, h);
+    g.strokeStyle = '#f3d27a'; g.lineWidth = 10; g.strokeRect(8, 8, w - 16, h - 16);
+    g.fillStyle = '#f3d27a'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = '900 78px "Playfair Display", Georgia, serif';
+    g.fillText(`TERA RECORD · ${meters.toLocaleString()} m`, w / 2, h / 2 + 4);
+    tex.needsUpdate = true;
+  };
+  return { group, draw };
+}
 
 export class Run {
   constructor(ctx) {
@@ -72,9 +104,38 @@ export class Run {
     this.kites = [];
     this.active = false;
     this.rival = new Rival(this.scene);
-    this.law = new Law(this);
+    this.arch = createRecordArch();
+    this.root.add(this.arch.group);
     this.errands = new Errands(this);
   }
+
+  /** Build every obstacle / pickup variant up front (behind the loading screen) so nothing is created mid-ride.
+   *  Returns the objects, parked in `this.root`, so the caller can render them once (shader compile + GPU upload). */
+  prewarm() {
+    const made = [];
+    const put = (key, make) => {
+      const o = make();
+      const g = o.group || o;
+      g.userData.poolKey = key;
+      if (!this.pools.has(key)) this.pools.set(key, []);
+      this.pools.get(key).push(o);
+      made.push(g);
+      return o;
+    };
+    for (const [type, T] of Object.entries(TYPES)) {
+      T.dimsCache ||= {};
+      for (let v = 0; v < T.variants; v++) { const m = put(`${type}${v}`, () => T.make()); T.dimsCache[v] = { hl: m.hl, hw: m.hw, h: m.h }; }
+    }
+    for (const type of Object.keys(POWERUPS)) { const def = POWERUPS[type]; put(`pu${type}`, () => createPowerup(type, def.color, def.icon).group); }
+    for (const ch of new Set(LETTERS)) put(`letter${ch}`, () => createLetter(ch));
+    for (let i = 0; i < 6; i++) put(`kite${i}`, createKitePickup);
+    for (let i = 0; i < 6; i++) put(`person${i}`, () => createStanding(randomLook()));
+    put('beaconW', () => createBeacon(0xffd60a)); put('beaconD', () => createBeacon(0x2bff88));
+    this.arch.draw(1234); this.arch.group.visible = true; this.arch.group.position.set(0, 0, -20);
+    made.forEach((g, i) => { g.position.set(((i % 9) - 4) * 2.6, 0, -8 - Math.floor(i / 9) * 5); g.rotation.set(0, 0, 0); this.root.add(g); });
+    return made;
+  }
+  endPrewarm(made) { for (const g of made) this.root.remove(g); this.arch.group.visible = false; }
 
   // ---------------- pooling ----------------
   take(key, make) {
@@ -99,7 +160,6 @@ export class Run {
     for (const k of this.kites) this.give(k.model);
     this.obs.length = 0; this.pickups.length = 0; this.letters.length = 0; this.kites.length = 0;
     this.rival.reset(0);
-    this.law?.reset();
     this.errands?.reset();
     if (this.mission) this.endMission(false, true);
     this.coins.clear();
@@ -135,7 +195,7 @@ export class Run {
     this.env.tod = this.startTod ?? 0.3;
     this.phase = null;
     this.nextKiteA = 260;
-    this.stats = { coins: 0, distance: 0, nearMiss: 0, fares: 0, smash: 0, tricks: 0, powerups: 0, gates: 0, rainDistance: 0, nightDistance: 0, hornClears: 0, maxSpeed: 0, faresRs: 0, rivals: 0, letters: 0, kites: 0, wheelies: 0, wheelieTime: 0, challans: 0, finesRs: 0, chases: 0, caught: 0, escapes: 0, cleanCams: 0, errands: 0 };
+    this.stats = { coins: 0, distance: 0, nearMiss: 0, fares: 0, smash: 0, tricks: 0, powerups: 0, gates: 0, rainDistance: 0, nightDistance: 0, hornClears: 0, maxSpeed: 0, faresRs: 0, rivals: 0, letters: 0, kites: 0, wheelies: 0, wheelieTime: 0, errands: 0 };
     this.fever = 0; this.feverCD = 0;
     this.headstart = 0;
     this.boostWindow = 7;
@@ -145,6 +205,12 @@ export class Run {
     this.ensureLetters();
     this.liveCheckT = 1;
     this.chatterT = 0;
+    this.slowmo = 0; this.slowCD = 3; this.timeScale = 1;
+    this.archPassed = false;
+    this.recordScore = save.high; this.recordBeaten = save.high < 500;
+    this.archA = (save.stats.bestDistance || 0) > 250 ? save.stats.bestDistance : 0;
+    if (this.archA) this.arch.draw(Math.floor(this.archA));
+    this.arch.group.visible = false;
     this.active = true;
     this.ui.district(placeAt(0));
     this.ui.letters(save.letters.got);
@@ -245,7 +311,7 @@ export class Run {
     const vehicle = () => pick(diff < 0.2 ? ['car', 'car', 'rickshaw', 'chingchi', 'bike', 'van', 'scooter', 'doodh'] : ['car', 'car', 'rickshaw', 'chingchi', 'van', 'truck', 'bus', 'bike', 'scooter', 'metro']);
     const w = [
       ['one', 3], ['two', 1.5 + diff * 2.5], ['jump', 1.4], ['ramp', 0.8], ['dog', 0.5], ['cat', 0.4], ['metro', 0.3],
-      ['bikes', 0.9], ['tonga', 0.5], ['puddle', 0.5], ['coins', 1.4 - diff], ['baraat', 0.35], ['breaker', 1.7], ['breakers2', 0.9], ['rough', 0.5], ['manhole', 0.05], ['naka', 0.25 + diff * 0.2],
+      ['bikes', 0.9], ['tonga', 0.5], ['puddle', 0.5], ['coins', 1.4 - diff], ['baraat', 0.35], ['breaker', 1.7], ['breakers2', 0.9], ['rough', 0.5], ['manhole', 0.05],
     ];
     let r = Math.random() * w.reduce((s, x) => s + x[1], 0), pat = 'one';
     for (const [k, v] of w) { if ((r -= v) < 0) { pat = k; break; } }
@@ -327,14 +393,6 @@ export class Run {
         this.coinLine(lanes[0], A + 8, 5);
         break;
       }
-      case 'naka': {
-        // police checkpoint across two lanes — find the open one
-        if (this.spawn('naka', lanes[0], A) && this.spawn('naka', lanes[1], A)) {
-          this.coinLine(lanes[2], A - 10, 6);
-          if (Math.random() < 0.5) setTimeout(() => this.active && this.ui.speech(pick(LINES.naka), 1800), 400);
-        }
-        break;
-      }
       case 'puddle': {
         this.spawn('puddle', lanes[0], A);
         if (Math.random() < 0.5) this.spawn('puddle', lanes[1], A + rand(-5, 5));
@@ -389,7 +447,7 @@ export class Run {
     if (a === 'left' && p.move(-1)) audio.tone(300, 0.06, { type: 'triangle', vol: 0.05 });
     else if (a === 'right' && p.move(1)) audio.tone(300, 0.06, { type: 'triangle', vol: 0.05 });
     else if (a === 'jump') p.jump();
-    else if (a === 'down') { this.law.brake(); p.down(); }
+    else if (a === 'down') p.down();
     else if (a === 'nitro') this.fireNitro();
     else if (a === 'horn') this.horn();
     else if (a === 'wheelie') p.wheelie();
@@ -433,9 +491,8 @@ export class Run {
       if (z > best) { best = z; target = o; }
     }
     if (!target) return;
-    if (target.T.animal || target.type === 'baraat' || target.type === 'naka') {
+    if (target.T.animal || target.type === 'baraat') {
       if (target.type === 'baraat') { this.ui.speech('Baraat ae bhaji, ruk ja! Mubarakaan! 🎉', 1800); return; }
-      if (target.type === 'naka') { this.ui.speech('Naka horn naal nahi hatda bhaji! 👮', 1800); return; }
       if (target.type === 'dog') { target.flee = true; target.dead = true; audio.bark?.(); this.ui.popup(pick(LINES.hornDog), 'good'); this.stats.hornClears++; return; }
       this.ui.speech(pick(LINES.hornCat), 1800); audio.meow?.(); return; }
     if (target.T.heavy) { setTimeout(() => audio.horn(3), 350); this.ui.popup('Truck waala nahi hatega bhaji!', 'warn'); return; }
@@ -475,7 +532,7 @@ export class Run {
     if (o.T.flat) return;
     if (o.T.animal) { o.flee = true; if (!quiet) audio.bark?.(); }
     if (o.T.noSmash) {
-      if (!quiet) { this.ui.popup(o.type === 'baraat' ? 'MUBARAKAAN! 🎉' : o.type === 'naka' ? 'NAKA TOD DITTA! 👮' : 'BACH GAYA! 🐾', 'good'); this.coinsRun += 10; this.fx.emit(o.x, 2, o.z, 30, { colors: [0xff2e88, 0xffd60a, 0x2bff88], speed: 6, up: 6, life: 1.2, size: 0.3, grav: 6 }); }
+      if (!quiet) { this.ui.popup(o.type === 'baraat' ? 'MUBARAKAAN! 🎉' : 'BACH GAYA! 🐾', 'good'); this.coinsRun += 10; this.fx.emit(o.x, 2, o.z, 30, { colors: [0xff2e88, 0xffd60a, 0x2bff88], speed: 6, up: 6, life: 1.2, size: 0.3, grav: 6 }); }
       return;
     }
     const side = o.x - this.player.x || (Math.random() - 0.5);
@@ -492,7 +549,6 @@ export class Run {
 
   damage(o) {
     this.lives--;
-    this.law.hit();
     this.invuln = 2.2; this.player.blink = 2.2;
     this.slow = 1;
     this.combo = 0; this.mult = 1; this.comboT = 0;
@@ -501,7 +557,7 @@ export class Run {
     this.ui.flash();
     this.ui.popup(pick(SHOUTS.ouch), 'bad');
     audio.crash();
-    try { navigator.vibrate?.(180); } catch { /* not supported */ }
+    buzz(180);
     this.fx.emit(this.player.x, 1, -1.2, 30, { colors: [0xffffff, 0xaaaaaa, 0xffd60a], speed: 6, up: 3, life: 0.8, size: 0.4 });
     this.smash(o, true);
     if (this.mission?.state === 'ride') { this.mission.timeLeft -= 5; this.ui.speech(pick(LINES.hit), 2000); }
@@ -512,10 +568,7 @@ export class Run {
     this.active = false;
     this.nitroOn = false;
     audio.engine(0, 0, false);
-    audio.setSiren(0);
     audio.ambience(null, null, false, 0);
-    if (this.law.chase) this.law.endChase();
-    this.law.challan = null; this.ui.challanPrompt(null);
     audio.gameover();
     audio.setMode('calm');
     this.onEnd();
@@ -605,6 +658,14 @@ export class Run {
   update(dt) {
     if (!this.active) return;
     const p = this.player;
+    // bullet time after a really close call: drop to 30 % speed and ease back over ~0.6 s
+    this.slowCD = Math.max(0, this.slowCD - dt);
+    if (this.slowmo > 0) {
+      this.slowmo = Math.max(0, this.slowmo - dt);
+      const k = 1 - this.slowmo / 0.6;
+      this.timeScale = 1 - 0.7 * Math.pow(Math.sin(Math.PI * Math.min(1, k * 1.15)), 0.6);
+    } else this.timeScale = 1;
+    dt *= this.timeScale;
     this.time += dt;
 
     // speed
@@ -639,6 +700,26 @@ export class Run {
 
     // score from distance
     this.score += this.speed * dt * this.mult * 0.5 * this.fx2;
+    if (!this.recordBeaten && this.score > this.recordScore) {
+      this.recordBeaten = true;
+      this.ui.popup('🏆 NAYA RECORD! 🏆', 'trick');
+      this.ui.confetti(90);
+      audio.gate();
+      buzz([20, 40, 20]);
+    }
+    if (this.archA) {
+      const z = this.D - this.archA;
+      this.arch.group.visible = z > -260 && z < 40;
+      this.arch.group.position.set(0, 0, z);
+      if (z > 0 && !this.archPassed) {
+        this.archPassed = true;
+        this.score += 1000 * this.mult; this.addCombo(2);
+        this.ui.popup('RECORD TOD DITTA! 🔥 +1000', 'trick');
+        audio.fare(); buzz(30);
+        this.fx.emit(p.x, 3, -3, 70, { colors: [0xffd60a, 0xd62828, 0xffffff], speed: 9, up: 6, life: 1.4, size: 0.3, grav: 5 });
+      }
+      if (z > 40) this.archA = 0;
+    }
 
     // player
     p.update(dt, this.speed, this.nitroOn || this.headstart > 0 ? 1 : 0);
@@ -727,15 +808,20 @@ export class Run {
         }
       } else if (!o.done && z > o.hl + pb.hl) {
         o.done = true;
-        if (o.over) { this.law.nearMiss(); this.stats.nearMiss++; this.addCombo(1); this.nitro = Math.min(1, this.nitro + 0.08); this.ui.popup(`AIR OVER! x${this.mult}`, 'good'); this.score += 100 * this.mult; }
+        if (o.over) { this.stats.nearMiss++; this.addCombo(1); this.nitro = Math.min(1, this.nitro + 0.08); this.ui.popup(`AIR OVER! x${this.mult}`, 'good'); this.score += 100 * this.mult; }
         else if (o.hard && (o.minDx < 2.4 || (o.minDx < 3.3 && this.time - p.lastLaneChange < 0.6))) {
           this.stats.nearMiss++;
-          this.law.nearMiss();
           this.addCombo(1);
           this.nitro = Math.min(1, this.nitro + 0.1);
           this.score += 50 * this.mult;
           this.ui.popup(`${pick(SHOUTS.near)} x${this.mult}`, 'near');
           audio.near();
+          buzz(12);
+          if (o.minDx < 1.85 && this.speed > 24 && this.slowCD <= 0 && !this.nitroOn) {
+            this.slowmo = 0.6; this.slowCD = 6;
+            this.score += 150 * this.mult;
+            this.ui.popup('BAAL BAAL BACHE! 😱 +150', 'trick');
+          }
         }
       }
     }
@@ -817,7 +903,6 @@ export class Run {
     }
 
     this.updateMission(dt);
-    this.law.update(dt);
     this.errands.update(dt);
     audio.ambience(placeAt(this.D).style, this.phase, true, dt);
 
@@ -922,6 +1007,7 @@ export class Run {
     else if (ev === 'trickStart') audio.tone(500, 0.3, { type: 'triangle', vol: 0.08, to: 1200 });
     else if (ev === 'trick') {
       this.stats.tricks++;
+      buzz(25);
       this.addCombo(2);
       this.nitro = Math.min(1, this.nitro + 0.2);
       const pts = Math.round(400 * this.mult);
@@ -930,13 +1016,13 @@ export class Run {
       audio.trick();
     } else if (ev === 'sloppy') this.ui.popup('Sloppy landing!', 'warn');
     else if (ev === 'bump') audio.tone(120, 0.08, { type: 'square', vol: 0.05 });
-    else if (ev === 'wheelieStart') { audio.rev?.(); this.ui.popup('WHEELIE! 🏍️', 'trick'); }
+    else if (ev === 'wheelieStart') { audio.rev?.(); this.ui.popup(p.isRickshaw ? 'DO PAHIYA! 🛺' : 'WHEELIE! 🏍️', 'trick'); }
     else if (ev === 'wheelieEnd') {
       const t = p.wheelieT;
       if (t > 0.8) {
         this.stats.wheelies++;
         this.addCombo(t > 2.5 ? 2 : 1);
-        this.ui.popup(`${pick(SHOUTS.wheelie)} ${t.toFixed(1)}s`, 'trick');
+        this.ui.popup(`${pick(p.isRickshaw ? SHOUTS.tilt : SHOUTS.wheelie)} ${t.toFixed(1)}s`, 'trick');
       }
     }
   }

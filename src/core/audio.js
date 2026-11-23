@@ -112,6 +112,21 @@ class AudioEngine {
     };
     this.pulsesLoad = Array.from({ length: 6 }, () => pulse(true));
     this.pulsesCoast = Array.from({ length: 6 }, () => pulse(false));
+    // rickshaw: a raspy 2-stroke — fires every turn, thinner pipe, more crackle ("trrr-trrr-trrr")
+    const pulse2 = (load) => {
+      const n = Math.round(sr * 0.04), buf = c.createBuffer(1, n, sr), d = buf.getChannelData(0);
+      const f1 = 150 + Math.random() * 25;
+      for (let i = 0; i < n; i++) {
+        const t = i / sr, atk = Math.min(1, t / 0.0004);
+        d[i] = atk * (Math.sin(2 * Math.PI * f1 * t) * Math.exp(-t / 0.011)
+          + 0.5 * Math.sin(2 * Math.PI * f1 * 2.9 * t) * Math.exp(-t / 0.006)
+          + (load ? 0.3 : 0.15) * Math.sin(2 * Math.PI * 1900 * t) * Math.exp(-t / 0.0025)
+          + (Math.random() * 2 - 1) * (load ? 0.9 : 0.45) * Math.exp(-t / 0.004));
+      }
+      return buf;
+    };
+    this.pulses2Load = Array.from({ length: 6 }, () => pulse2(true));
+    this.pulses2Coast = Array.from({ length: 6 }, () => pulse2(false));
     // valve-train tick
     const tn = Math.round(sr * 0.006); this.tickBuf = c.createBuffer(1, tn, sr);
     const td = this.tickBuf.getChannelData(0);
@@ -153,13 +168,13 @@ class AudioEngine {
       this.firePulse(e.nextFire);
       const idle = e.rpm < 2200;
       const jitter = idle ? 0.09 : 0.02;
-      e.nextFire += (120 / e.rpm) * (1 + (Math.random() - 0.5) * 2 * jitter);
+      e.nextFire += ((this.twoStroke ? 84 : 120) / e.rpm) * (1 + (Math.random() - 0.5) * 2 * jitter);
     }
   }
   firePulse(when) {
     const e = this.eng, c = this.ctx;
     const loaded = e.load > 0.45;
-    const bank = loaded ? this.pulsesLoad : this.pulsesCoast;
+    const bank = this.twoStroke ? (loaded ? this.pulses2Load : this.pulses2Coast) : (loaded ? this.pulsesLoad : this.pulsesCoast);
     const src = c.createBufferSource(); src.buffer = bank[(Math.random() * bank.length) | 0];
     const g = c.createGain();
     let amp = (0.4 + e.load * 0.6) * (0.88 + Math.random() * 0.24);
@@ -189,6 +204,8 @@ class AudioEngine {
     this.tone(1900, 0.18, { type: 'sine', vol: 0.02, to: 1500, when: t + 0.05 });     // lever spring
     e.on = true; e.kick = 0.9; e.rpm = 420; e.gear = 1; this.gear = 1;
   }
+  /** 'bike' = 4-stroke 125, 'rickshaw' = 2-stroke auto. */
+  setEngineType(kind) { this.twoStroke = kind === 'rickshaw'; }
   /** Throttle blip (wheelie pop, menu horn). */
   rev() { if (this.eng) this.eng.blip = 0.6; }
 
@@ -262,7 +279,6 @@ class AudioEngine {
     lfo.connect(lg).connect(this.crowdGain.gain); lfo.start();
     n2.connect(f2).connect(this.crowdGain).connect(this.sfx); n2.start();
     this.ambT = 2;
-    this.siren = null;
   }
   /** style: androon | anarkali | minar | canal | gulberg; phase: subah | dopehar | shaam | raat */
   ambience(style, phase, on, dt) {
@@ -286,31 +302,8 @@ class AudioEngine {
       this.tone(90 + Math.random() * 30, 1.2, { type: 'sawtooth', vol: 0.012, to: 70, when: t });
     }
   }
-  /** Police siren: wailing two-tone, loudness = how close the police bike is (0..1). */
-  setSiren(level) {
-    if (!this.ctx) return;
-    const c = this.ctx, t = c.currentTime;
-    if (!this.siren && level > 0) {
-      const o = c.createOscillator(); o.type = 'sawtooth';
-      const lfo = c.createOscillator(); lfo.type = 'triangle'; lfo.frequency.value = 0.9;
-      const lg = c.createGain(); lg.gain.value = 260; lfo.connect(lg).connect(o.frequency);
-      o.frequency.value = 900;
-      const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1100; f.Q.value = 1.2;
-      const g = c.createGain(); g.gain.value = 0;
-      o.connect(f).connect(g).connect(this.sfx); o.start(); lfo.start();
-      this.siren = { o, lfo, g };
-    }
-    if (!this.siren) return;
-    this.siren.g.gain.setTargetAtTime(level * 0.09, t, 0.15);
-    if (level <= 0) {
-      const sr = this.siren; this.siren = null;
-      setTimeout(() => { try { sr.o.stop(); sr.lfo.stop(); } catch { /* already stopped */ } }, 800);
-    }
-  }
   bark() { const t = this.ctx?.currentTime; if (!t) return; for (const d of [0, 0.22]) { this.tone(420, 0.12, { type: 'sawtooth', vol: 0.06, to: 260, when: t + d }); this.noise(0.1, { vol: 0.12, type: 'bandpass', freq: 900, q: 2, when: t + d }); } }
   meow() { const t = this.ctx?.currentTime; if (!t) return; this.tone(620, 0.45, { type: 'triangle', vol: 0.05, to: 900, when: t }); this.tone(900, 0.3, { type: 'triangle', vol: 0.04, to: 500, when: t + 0.35 }); }
-  shutter() { this.noise(0.05, { vol: 0.4, type: 'highpass', freq: 3000 }); this.tone(1800, 0.05, { type: 'square', vol: 0.05, when: this.ctx?.currentTime + 0.06 }); this.tone(1200, 0.25, { type: 'sine', vol: 0.06, to: 600 }); }
-  whistle() { const t = this.ctx?.currentTime; if (!t) return; for (const [d, l] of [[0, 0.18], [0.25, 0.5]]) { this.tone(2900, l, { type: 'sine', vol: 0.12, when: t + d }); this.noise(l, { vol: 0.05, type: 'bandpass', freq: 2900, q: 8, when: t + d }); } }
   ring() { const t = this.ctx?.currentTime; if (!t) return; for (let k = 0; k < 2; k++) for (let i = 0; i < 8; i++) this.tone(i % 2 ? 1320 : 1760, 0.05, { type: 'square', vol: 0.035, when: t + k * 0.8 + i * 0.05 }); }
   slap() { this.noise(0.12, { vol: 0.35, type: 'bandpass', freq: 1500, q: 1.5 }); this.tone(220, 0.1, { type: 'triangle', vol: 0.1, to: 120 }); }
 

@@ -6,6 +6,15 @@ import { curvify } from './curve.js';
 import { TEX } from './textures.js';
 
 export const MATS = {};
+/** Night glow of window glass (driven by the time of day). */
+export const GLASS_GLOW = { value: 1 };
+// roughness, metalness, glass-glow for the kinds that share the uber material
+export const RM = { solid: [0.82, 0, 0], shiny: [0.25, 0.6, 0], glass: [0.08, 0.2, 1] };
+export function rmAttr(n, r, m, e = 0) {
+  const a = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { a[i * 3] = r; a[i * 3 + 1] = m; a[i * 3 + 2] = e; }
+  return new THREE.BufferAttribute(a, 3);
+}
 export const rand = (a, b) => a + Math.random() * (b - a);
 export const randi = (a, b) => Math.floor(rand(a, b + 1));
 export const pick = arr => arr[Math.floor(Math.random() * arr.length)];
@@ -13,9 +22,20 @@ export const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 export function initMaterials() {
   const std = o => curvify(new THREE.MeshStandardMaterial({ vertexColors: true, ...o }));
   const basic = o => curvify(new THREE.MeshBasicMaterial({ vertexColors: true, ...o }));
+  // One "uber" material for every plain vertex-coloured part: roughness, metalness and a window glow
+  // ride along per vertex (attribute `rm`), so matte walls, chrome and glass share a single draw call.
   MATS.solid = std({ roughness: 0.82 });
-  MATS.shiny = std({ roughness: 0.25, metalness: 0.6 });
-  MATS.glass = std({ roughness: 0.08, metalness: 0.2, emissive: 0x0a1a2a, emissiveIntensity: 1 });
+  MATS.solid.onBeforeCompile = (prev => shader => {
+    prev(shader);
+    shader.uniforms.uGlassGlow = GLASS_GLOW;
+    shader.vertexShader = 'attribute vec3 rm;\nvarying vec3 vRM;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvRM = rm;');
+    shader.fragmentShader = 'uniform float uGlassGlow;\nvarying vec3 vRM;\n' + shader.fragmentShader
+      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = vRM.x;')
+      .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = vRM.y;')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vec3(0.04, 0.1, 0.16) * vRM.z * uGlassGlow;');
+  })(MATS.solid.onBeforeCompile);
+  MATS.solid.customProgramCacheKey = () => 'curved-uber';
+  MATS.shiny = MATS.glass = MATS.solid;
   MATS.facade = std({ map: TEX.facade, emissiveMap: TEX.facadeLit, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.85 });
   MATS.art = std({ map: TEX.art, roughness: 0.5 });
   MATS.sign = std({ map: TEX.signs, emissiveMap: TEX.signs, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.6 });
@@ -23,7 +43,6 @@ export function initMaterials() {
   MATS.road = std({ map: TEX.road, roughness: 0.92, metalness: 0, normalMap: TEX.roadNormal, normalScale: new THREE.Vector2(0.55, 0.55), emissiveMap: TEX.roadLit, emissive: 0xffffff, emissiveIntensity: 0 });
   MATS.kite = std({ roughness: 0.6, side: THREE.DoubleSide });
   MATS.roadsign = std({ map: TEX.roadsigns, roughness: 0.4, emissiveMap: TEX.roadsigns, emissive: 0xffffff, emissiveIntensity: 0.18 });
-  MATS.limit = std({ map: TEX.limits, transparent: true, alphaTest: 0.2, roughness: 0.5, emissiveMap: TEX.limits, emissive: 0xffffff, emissiveIntensity: 0.25 });
   MATS.string = basic({ transparent: true, opacity: 0.55 });
   MATS.walk = std({ map: TEX.walk, roughness: 0.9 });
   MATS.ground = std({ map: TEX.ground, roughness: 1 });
@@ -70,6 +89,8 @@ export class Builder {
     _c.set(color);
     for (let i = 0; i < n; i++) { col[i * 3] = _c.r; col[i * 3 + 1] = _c.g; col[i * 3 + 2] = _c.b; }
     g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const rm = RM[kind];
+    if (rm) { g.setAttribute('rm', rmAttr(n, rm[0], rm[1], rm[2])); kind = 'solid'; }
     (this.parts[kind] ||= []).push(g);
     return g;
   }

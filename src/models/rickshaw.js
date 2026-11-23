@@ -1,18 +1,35 @@
-// The player's auto-rickshaw. Faces -z. Origin = ground under the middle of the vehicle.
+// Auto-rickshaws. The player's one uses the same pivot stack as the 125 so the Player code drives both:
+//   root (position) → tilt (lean / yaw / two-wheel stunt) → flip (backflip, centre of mass)
+//   → pitch (nose-up, rear axle) → body
+// Faces -z. Origin = ground under the middle of the vehicle.
 import * as THREE from 'three';
-import { Builder, MATS } from '../render/kit.js';
+import { Builder, MATS, pick } from '../render/kit.js';
 import { artUV } from '../render/textures.js';
 import { addSeated } from './person.js';
 import { customModel } from '../render/gltf.js';
+import { makeShield } from './bike.js';
 
 const DARK = 0x1a1a1a, CHROME = 0xdedede, SEAT = 0x8b1a1a;
+const REAR_AXLE = new THREE.Vector3(0, 0.31, 0.92);
+const COM = new THREE.Vector3(0, 0.95, 0.1);
 
-export function createRickshaw(skin) {
-  const root = new THREE.Group();
-  const tilt = new THREE.Group();     // roll / pitch / trick spin
-  root.add(tilt);
-  const b = new Builder();
+/** Recolour the Blender rickshaw: paint, trim, canopy and seat (each instance gets its own materials). */
+function paint(group, skin, classy) {
+  group.traverse(o => {
+    if (!o.isMesh) return;
+    const n = o.material?.name;
+    const hex = n === 'body_green' ? skin.body : n === 'trim_yellow' ? skin.trim : n === 'canopy' ? skin.canopy : n === 'seat.001' ? skin.seat : undefined;
+    if (hex === undefined) return;
+    o.material = o.material.clone();
+    o.material.color.setHex(hex);
+    if (classy && n === 'body_green') { o.material.metalness = 0.5; o.material.roughness = 0.18; }     // metallic show paint
+    if (classy && n === 'trim_yellow') { o.material.metalness = 0.7; o.material.roughness = 0.22; }
+    if (classy && n === 'canopy') { o.material.roughness = 0.45; o.material.metalness = 0.1; }          // leather-look roof
+  });
+}
 
+/** Procedural stand-in if the .glb is missing. */
+function proceduralBody(b, skin) {
   // chassis + rear tub
   b.box(1.3, 0.14, 2.7, DARK, 0, 0.42, 0.05);
   b.box(1.52, 0.62, 1.35, skin.body, 0, 0.8, 0.62);
@@ -71,69 +88,106 @@ export function createRickshaw(skin) {
   b.box(0.28, 0.06, 0.6, skin.trim, 0, 0.67, -1.17, { kind: 'shiny' });
   b.cyl(0.055, 0.055, 0.6, CHROME, 0.45, 0.36, 1.3, { r: [Math.PI / 2, 0, 0], kind: 'shiny', seg: 8 });
   if (skin.glow) b.box(1.2, 0.03, 2.4, skin.glow, 0, 0.33, 0.05, { kind: 'glow' });
-  addSeated(b, 0, 1.12, -0.22, { skin: 0xb07a52, shirt: 0xd9d2bf, pants: 0x55524a, hat: 0x2b2b2b, scarf: 0xb33a3a });
-  b.plane(3.2, 12, 'beamSoft', 0xffffff, [0, 0.07, -7.2], [-Math.PI / 2, 0, 0]);
-  b.plane(2.1, 3.7, 'shadow', 0xffffff, [0, 0.03, 0.1], [-Math.PI / 2, 0, 0]);
+  addSeated(b, 0, 1.12, -0.22, { skin: 0xb07a52, shirt: skin.kameez ?? 0xd9d2bf, pants: 0x55524a, hat: 0x2b2b2b, scarf: 0xb33a3a });
+}
+
+/** The player's rickshaw. `skin` = a paint job from config (body / trim / kameez / glow). */
+export function createRickshaw(skin) {
+  const root = new THREE.Group();
+  const tilt = new THREE.Group();
+  const flip = new THREE.Group();
+  const pitch = new THREE.Group();
+  const body = new THREE.Group();
+  root.add(tilt);
+  tilt.add(flip); flip.position.copy(COM);
+  flip.add(pitch); pitch.position.copy(REAR_AXLE).sub(COM);
+  pitch.add(body); body.position.copy(REAR_AXLE).negate();
+
+  const look = { body: skin.body, trim: skin.trim, canopy: skin.canopy ?? 0x121212, seat: skin.seat ?? 0x5a0f14, kameez: skin.kameez, stripe: [skin.trim, 0xd62828, 0xffd60a, 0x1565c0] };
   const custom = customModel('rickshaw');
-  if (custom) { b.parts = { beamSoft: b.parts.beamSoft }; tilt.add(b.build(), custom.group); } // Blender body + keep the night headlight pool
-  else tilt.add(b.build());
+  let wheels = [];
+  if (custom) {
+    paint(custom.group, look, true);
+    body.add(custom.group);
+    wheels = custom.wheels;
+  } else {
+    const b = new Builder();
+    proceduralBody(b, look);
+    body.add(b.build());
+    const wheel = (x, y, z) => {
+      const w = new Builder();
+      w.cyl(0.3, 0.3, 0.2, 0x151515, 0, 0, 0, { r: [0, 0, Math.PI / 2], seg: 14 });
+      w.cyl(0.17, 0.17, 0.22, CHROME, 0, 0, 0, { r: [0, 0, Math.PI / 2], kind: 'shiny', seg: 8 });
+      w.box(0.23, 0.05, 0.3, 0x444444, 0, 0, 0);
+      const g = w.build();
+      g.position.set(x, y, z);
+      g.children.forEach(m => (m.matrixAutoUpdate = true));
+      body.add(g);
+      wheels.push(g);
+    };
+    wheel(-0.7, 0.3, 0.92); wheel(0.7, 0.3, 0.92); wheel(0, 0.3, -1.18);
+  }
 
-  // wheels (separate so they can spin)
-  const wheels = [];
-  const wheel = (x, y, z) => {
-    const w = new Builder();
-    w.cyl(0.3, 0.3, 0.2, 0x151515, 0, 0, 0, { r: [0, 0, Math.PI / 2], seg: 14 });
-    w.cyl(0.17, 0.17, 0.22, CHROME, 0, 0, 0, { r: [0, 0, Math.PI / 2], kind: 'shiny', seg: 8 });
-    w.box(0.23, 0.05, 0.3, 0x444444, 0, 0, 0);
-    const g = w.build();
-    g.position.set(x, y, z);
-    g.children.forEach(m => (m.matrixAutoUpdate = true));
-    tilt.add(g);
-    wheels.push(g);
-  };
-  if (!custom) { wheel(-0.7, 0.3, 0.92); wheel(0.7, 0.3, 0.92); wheel(0, 0.3, -1.18); }
-  else wheels.push(...custom.wheels);
+  // premium touches: chrome side rails, warm LED strip under the canopy, optional neon underglow
+  const x = new Builder();
+  for (const s of [-1, 1]) {
+    x.cyl(0.025, 0.025, 1.9, CHROME, s * 0.86, 0.62, 0.15, { r: [Math.PI / 2, 0, 0], kind: 'shiny', seg: 6 });
+    x.box(0.03, 0.03, 2.3, skin.glow ?? 0xffe2a8, s * 0.8, 1.92, 0.12, { kind: 'glow' });
+  }
+  x.box(1.5, 0.03, 0.03, skin.glow ?? 0xffe2a8, 0, 1.92, -1.08, { kind: 'glow' });
+  if (skin.glow) x.box(1.2, 0.03, 2.3, skin.glow, 0, 0.22, 0.05, { kind: 'glow' });
+  body.add(x.build());
 
-  // passenger (toggled)
+  const b = new Builder();
+  b.plane(3.2, 12, 'beamSoft', 0xffffff, [0, 0.07, -7.2], [-Math.PI / 2, 0, 0]);
+  if (!custom) b.plane(2.1, 3.7, 'shadow', 0xffffff, [0, 0.03, 0.1], [-Math.PI / 2, 0, 0]);
+  tilt.add(b.build());
+
+  // sawari on the back seat (toggled)
   const pb = new Builder();
   addSeated(pb, 0, 0, 0, { skin: 0xc68a5e, shirt: 0x3f6fb5, pants: 0x2a3550, hat: null, scarf: 0xf2c14e }, 'down');
   const passenger = pb.build();
-  passenger.position.set(0.28, 1.27, 0.86);
+  passenger.position.set(0.28, 1.2, 0.86).add(body.position);
   passenger.visible = false;
-  tilt.add(passenger);
+  pitch.add(passenger);
 
-  // nitro flames
+  // nitro flame out of the exhaust (rear right)
   const flameMat = new THREE.MeshBasicMaterial({ color: 0x5ee7ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
   const flame = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.9, 8), flameMat);
   flame.rotation.x = Math.PI / 2;
-  flame.position.set(0.45, 0.36, 1.95);
+  flame.position.set(0.45, 0.36, 1.95).add(body.position);
   flame.visible = false;
-  tilt.add(flame);
+  pitch.add(flame);
 
-  // shield bubble
-  const shieldMat = new THREE.ShaderMaterial({
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    uniforms: { t: { value: 0 }, col: { value: new THREE.Color(0x4fc3f7) }, a: { value: 1 } },
-    vertexShader: `varying vec3 vN; varying vec3 vV; varying vec3 vP;
-      void main(){ vN = normalize(normalMatrix*normal); vec4 mv = modelViewMatrix*vec4(position,1.0); vV = -mv.xyz; vP = position; gl_Position = projectionMatrix*mv; }`,
-    fragmentShader: `uniform float t; uniform vec3 col; uniform float a; varying vec3 vN; varying vec3 vV; varying vec3 vP;
-      void main(){ float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 2.5);
-        float hex = 0.5 + 0.5*sin(vP.y*14.0 - t*4.0)*sin(vP.x*14.0);
-        gl_FragColor = vec4(col, (f*0.9 + hex*0.08) * a); }`,
-  });
-  const shield = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 3), shieldMat);
-  shield.scale.set(1.25, 1.35, 2.0);
+  const shield = makeShield();
+  shield.scale.set(1.3, 1.4, 2.0);
   shield.position.set(0, 1.15, 0.1);
-  shield.visible = false;
   tilt.add(shield);
 
-  // headlight spot
   const head = new THREE.SpotLight(0xfff1c8, 0, 60, 0.5, 0.6, 1.2);
   head.position.set(0, 1.2, -1.2);
   head.target.position.set(0, 0, -20);
   root.add(head, head.target);
 
-  return { root, tilt, wheels, passenger, flame, shield, head };
+  return { root, tilt, flip, pitch, body, wheels, passenger, flame, shield, head, riderHead: null, kind: 'rickshaw' };
+}
+
+const TRAFFIC_LOOKS = [
+  { body: 0x1b7f3b, trim: 0xffd60a, canopy: 0x141414, seat: 0x5a0f14 },
+  { body: 0x0b5e3a, trim: 0xf2c14e, canopy: 0x1c1c1c, seat: 0x7a1f1f },
+  { body: 0xc81d25, trim: 0xf5f5f5, canopy: 0x202020, seat: 0x3a2a1a },
+  { body: 0x1a3c8f, trim: 0xffd60a, canopy: 0x151515, seat: 0x5a0f14 },
+  { body: 0xe0a81c, trim: 0x1b7f3b, canopy: 0x111111, seat: 0x6b0f1a },
+];
+/** A traffic rickshaw in one of the city's usual colours. */
+export function createTrafficRickshawModel() {
+  const look = pick(TRAFFIC_LOOKS);
+  const c = customModel('rickshaw');
+  if (c) { paint(c.group, look, false); return c.group; }
+  const b = new Builder();
+  proceduralBody(b, { ...look, kameez: 0xd9d2bf, stripe: [0xd62828, 0xffd60a] });
+  b.plane(2.1, 3.7, 'shadow', 0xffffff, [0, 0.03, 0.1], [-Math.PI / 2, 0, 0]);
+  return b.build();
 }
 
 export { MATS };

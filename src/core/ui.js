@@ -9,7 +9,7 @@ export const ui = {
   init() {
     for (const id of ['hud', 'hud-score', 'hud-mult', 'hud-dist', 'hud-coins', 'hud-lives', 'hud-speed', 'hud-nitro', 'hud-powers',
       'hud-mission', 'hud-mission-text', 'hud-mission-time', 'hud-mission-bar', 'popups', 'toast', 'bubble', 'bubble-text',
-      'district', 'district-tag', 'district-name', 'district-urdu', 'district-bonus', 'flash', 'speedlines', 'vignette', 'touch-pad', 'hud-gear', 'hud-tod', 'hud-place', 'speedo', 'speedo-needle', 'speedo-limit']) els[id] = $(id);
+      'district', 'district-tag', 'district-name', 'district-urdu', 'district-bonus', 'flash', 'speedlines', 'vignette', 'touch-pad', 'hud-gear', 'hud-tod', 'hud-place', 'speedo', 'speedo-arc', 'speedo-tip', 'btn-nitro']) els[id] = $(id);
     this.last = {};
   },
 
@@ -33,9 +33,12 @@ export const ui = {
     set('hud-speed', Math.round(r.speed * 3.6));
     set('hud-gear', r.gear ? String(r.gear) : 'N');
     const kmh = r.speed * 3.6;
-    els['speedo-needle'].style.transform = `rotate(${-120 + Math.min(1, kmh / 180) * 240}deg)`;
-    const over = r.law?.limit && kmh > r.law.limit + 6;
-    if (this.last.over !== over) { this.last.over = over; els.speedo.classList.toggle('over', !!over); }
+    const pct = Math.round(Math.min(1, kmh / 180) * 100);
+    if (this.last.pct !== pct) {
+      this.last.pct = pct;
+      els['speedo-arc'].setAttribute('stroke-dasharray', `${pct} 100`);
+      els['speedo-tip'].setAttribute('transform', `rotate(${-120 + pct * 2.4} 60 60)`);
+    }
     if (r.placeName) set('hud-place', r.placeName);
     const mult = r.mult > 1 ? `x${r.mult}` : '';
     if (this.last.mult !== mult) {
@@ -52,13 +55,22 @@ export const ui = {
       els['hud-nitro'].style.width = n + '%';
       els['hud-nitro'].parentElement.classList.toggle('ready', r.nitro >= 0.3 && !r.nitroOn);
       els['hud-nitro'].parentElement.classList.toggle('on', r.nitroOn);
+      const b = els['btn-nitro'];
+      b.style.setProperty('--charge', n);
+      b.classList.toggle('ready', r.nitro >= 0.3 && !r.nitroOn);
+      b.classList.toggle('on', r.nitroOn);
     }
     const pw = powers.map(p => `<div class="pw ${p.id}"><span>${p.icon}</span><i style="width:${Math.round(p.frac * 100)}%"></i></div>`).join('');
     if (this.last.pw !== pw) { this.last.pw = pw; els['hud-powers'].innerHTML = pw; }
     // speed lines + vignette intensity
     const sl = r.nitroOn ? 0.55 : Math.min(0.4, Math.max(0, (r.speed - 30) / 40));
-    els.speedlines.style.opacity = sl.toFixed(2);
-    els.speedlines.classList.toggle('nitro', r.nitroOn);
+    const slTxt = sl.toFixed(2);
+    if (this.last.sl !== slTxt) {
+      this.last.sl = slTxt;
+      els.speedlines.style.opacity = slTxt;
+      els.speedlines.classList.toggle('on', sl > 0.01);     // the spinning layer only animates while visible
+    }
+    if (this.last.slN !== r.nitroOn) { this.last.slN = r.nitroOn; els.speedlines.classList.toggle('nitro', r.nitroOn); }
   },
 
   mission(m) {
@@ -107,46 +119,6 @@ export const ui = {
     later('flash', 120, () => els.flash.classList.remove('on'));
   },
 
-  /** Speed-limit badge on the speedo while inside a camera zone. */
-  limit(l) {
-    els['speedo-limit'].textContent = l || '';
-    els['speedo-limit'].classList.toggle('hidden', !l);
-    if (!l) els.speedo.classList.remove('over');
-  },
-  camFlash() { const f = $('camflash'); f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); },
-  /** Warden's stop window: { frac, fine } or null. */
-  challanPrompt(c) {
-    const el = $('challan-prompt');
-    if (!c) { el.classList.add('hidden'); return; }
-    el.classList.remove('hidden');
-    $('challan-fine').textContent = c.fine;
-    $('challan-bar').style.width = Math.max(0, c.frac) * 100 + '%';
-  },
-  /** The paper challan slip, shown for a few seconds. */
-  challanSlip(c) {
-    const el = $('challan-slip');
-    const no = 'LHR-' + Math.floor(100000 + Math.random() * 899999);
-    const d = new Date();
-    const fineLine = c.udhaar
-      ? `<div class="slip-fine udhaar"><span>Udhaar</span><b>Rs ${c.fine.toLocaleString()}</b></div><div class="slip-note">Jeb khaali — agli kamai ton katega</div>`
-      : `<div class="slip-fine"><span>Jurmana <small>(aadhi kamai)</small></span><b>Rs ${c.fine.toLocaleString()}</b></div>`;
-    el.innerHTML = `<div class="slip-head"><small>CITY TRAFFIC POLICE · LAHORE</small><b>${c.title}</b></div>
-      <div class="slip-grid"><span>Challan</span><b>${no}</b><span>Waqt</span><b>${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</b><span>Gaddi</span><b>125 · LEB-${Math.floor(1000 + Math.random() * 8999)}</b></div>
-      <div class="slip-offence">${c.offence}</div>
-      ${fineLine}
-      <div class="slip-remark">“${c.remark}”</div>
-      <div class="slip-stamp">${c.stamp}</div>`;
-    el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
-    later('slip', 2000, () => el.classList.remove('on'));
-  },
-  chase(on) {
-    $('hud-chase').classList.toggle('hidden', !on);
-    $('siren').classList.toggle('on', on);
-  },
-  chaseGap(frac, flash) {
-    $('chase-bar').style.width = Math.max(0, Math.min(1, frac)) * 100 + '%';
-    $('siren').classList.toggle('blue', flash);
-  },
   /** Ammi's errand chip: { icon, name, m } or null. */
   errand(e) {
     const el = $('hud-errand');
@@ -253,6 +225,7 @@ export const ui = {
     els.toast.classList.remove('on');
     els.district.classList.remove('on');
     els.speedlines.style.opacity = 0;
+    els.speedlines.classList.remove('on', 'nitro');
     this.mission(null);
     this.last = {};
   },

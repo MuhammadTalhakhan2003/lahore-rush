@@ -15,8 +15,6 @@ const POOL = [
   { id: 'night', text: 'Drive {n} m at night', stat: 'nightDistance', per: 'total', n: [500, 1200, 2500] },
   { id: 'horn', text: 'Clear the way with your horn {n} times', stat: 'hornClears', per: 'total', n: [3, 8, 15] },
   { id: 'kites', text: 'Loot {n} Basant kites', stat: 'kites', per: 'total', n: [3, 8, 16] },
-  { id: 'cleancam', text: 'Pass {n} speed cameras under the limit', stat: 'cleanCams', per: 'total', n: [2, 4, 8] },
-  { id: 'escape', text: 'Escape the police {n} times', stat: 'escapes', per: 'total', n: [1, 2, 4] },
   { id: 'errands', text: "Finish {n} of Ammi's errands", stat: 'errands', per: 'total', n: [1, 3, 5] },
   { id: 'wheelies', text: 'Pull {n} wheelies (0.8 s+)', stat: 'wheelies', per: 'total', n: [3, 8, 15] },
 ];
@@ -24,8 +22,6 @@ const REWARD = [150, 300, 600];
 
 export const ACHIEVEMENTS = [
   { id: 'first', name: 'Pehli Sawari', desc: 'Deliver your first passenger', test: s => s.fares >= 1 },
-  { id: 'shareef', name: 'Shareef Shehri', desc: 'Pass 25 speed cameras under the limit', test: s => (s.cleanCams || 0) >= 25 },
-  { id: 'chakma', name: 'Chakma Expert', desc: 'Escape the police 10 times', test: s => (s.escapes || 0) >= 10 },
   { id: 'ammi', name: 'Ammi da Laadla', desc: "Finish 20 of Ammi's errands", test: s => (s.errands || 0) >= 20 },
   { id: 'basant', name: 'Bo Kaata!', desc: 'Loot 50 Basant kites', test: s => (s.kites || 0) >= 50 },
   { id: 'wheelie', name: 'Wheelie King', desc: 'Pull 40 wheelies', test: s => (s.wheelies || 0) >= 40 },

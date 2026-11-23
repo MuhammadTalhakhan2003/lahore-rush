@@ -3,16 +3,16 @@ const KEY = 'lahore-rush-save-v1';
 
 const DEFAULTS = () => ({
   coins: 0,
-  debt: 0,          // unpaid challans (udhaar), taken from the next earnings
   high: 0,
   leaderboard: [], // {score, distance, date}
   upgrades: { nitro: 0, magnet: 0, shield: 0, double: 0, coinValue: 0, armor: 0 },
   skins: ['classic'],
   skin: 'classic',
+  vehicle: 'bike',   // 'bike' (125) | 'rickshaw'
   horn: 0,
   horns: [0],
   settings: { volume: 0.8, music: true, quality: 'auto', shake: true, muted: false, startTime: 'subah' },
-  stats: { runs: 0, distance: 0, coins: 0, fares: 0, smash: 0, tricks: 0, nearMiss: 0, powerups: 0, gates: 0, bestDistance: 0, maxSpeed: 0, kites: 0, wheelies: 0, challans: 0, escapes: 0, errands: 0, cleanCams: 0 },
+  stats: { runs: 0, distance: 0, coins: 0, fares: 0, smash: 0, tricks: 0, nearMiss: 0, powerups: 0, gates: 0, bestDistance: 0, maxSpeed: 0, kites: 0, wheelies: 0, errands: 0 },
   achievements: [],
   items: { headstart: 0, shieldStart: 0 },
   unlocked: ['delhi'],

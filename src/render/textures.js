@@ -52,7 +52,6 @@ export const gateUV = i => { const c = i % 4, r = Math.floor(i / 4); return [c /
 export const posterUV = i => { i %= 12; const c = i % 4, r = Math.floor(i / 4); return [c / 4, 1 - (r + 1) / 3, (c + 1) / 4, 1 - r / 3]; };
 export const letterUV = ch => { const i = 'LAHORE'.indexOf(ch); return [i / 6, 0, (i + 1) / 6, 1]; };
 export const iconUV = i => [i / 5, 0, (i + 1) / 5, 1];
-export const LIMITS = [60, 80, 100, 120, 140];
 // Real Lahore underpasses (Canal Bank Road chain + Kalma Chowk) and flyovers
 export const UNDERPASSES = ['Kalma Chowk Underpass', 'Doctors Hospital Underpass', 'Jinnah Hospital Underpass', 'Punjab University Underpass', 'Muslim Town Underpass', 'Ferozepur Road Underpass', 'FC College Underpass', 'Jail Road Underpass', 'Mall Road Underpass', 'Dharampura Underpass'];
 export const FLYOVERS = ['Thokar Niaz Baig Flyover', 'Azadi Chowk Flyover', 'Akbar Chowk Flyover', 'Kalma Chowk Flyover', 'Shahdara Flyover', 'Ring Road Interchange'];
@@ -355,17 +354,6 @@ export function buildTextures(districts) {
       g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
       fitText(g, t, w - 60, 46, '800');
       g.fillText(t, w / 2, y + 50);
-    });
-  }), { repeat: false });
-
-  // ---- speed-limit signs (white disc, red ring, number) ----
-  TEX.limits = tex(paint(640, 128, (g) => {
-    LIMITS.forEach((n, i) => {
-      const x = i * 128 + 64;
-      g.fillStyle = '#d62828'; g.beginPath(); g.arc(x, 64, 60, 0, 7); g.fill();
-      g.fillStyle = '#fff'; g.beginPath(); g.arc(x, 64, 46, 0, 7); g.fill();
-      g.fillStyle = '#111'; g.font = '900 44px "Trebuchet MS", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillText(String(n), x, 67);
     });
   }), { repeat: false });
 

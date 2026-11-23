@@ -1,6 +1,6 @@
 // Sky dome, stars, sun/moon, fog and lighting driven by a time-of-day value (0..1, 0 = midnight).
 import * as THREE from 'three';
-import { MATS } from './kit.js';
+import { MATS, GLASS_GLOW } from './kit.js';
 import { TEX } from './textures.js';
 
 const KEYS = [
@@ -171,8 +171,13 @@ export class Environment {
     MATS.road.emissiveIntensity = n * 0.8;
     MATS.pool.opacity = n * 0.3;
     MATS.beamSoft.opacity = Math.max(0, n - 0.2) * 0.26;
+    // invisible additive layers still cost fill-rate: switch them off in daylight
+    MATS.pool.visible = MATS.pool.opacity > 0.01;
+    MATS.beamSoft.visible = MATS.beamSoft.opacity > 0.01;
+    this.skyline.children[1].visible = this.skylineLitMat.opacity > 0.01;
+    this.stars.visible = this.starMat.opacity > 0.01;
     MATS.water.color.copy(u.hor.value).lerp(new THREE.Color(0xbfe6f2), 0.55);
-    MATS.glass.emissiveIntensity = 1 + n * 1.2;
+    GLASS_GLOW.value = 1 + n * 1.2;
     this.scene.environmentIntensity = (0.22 + (1 - n) * 0.78) * (1 - rain * 0.3);
     return k;
   }

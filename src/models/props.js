@@ -89,30 +89,6 @@ export function createPuddle() {
   return { group: b.build(), hw: 1.1, hl: 1.6, h: 0.1 };
 }
 
-/** Police naka: striped barrier, cones and a sign — blocks one lane, can't be jumped. */
-export function createNaka() {
-  const b = new Builder();
-  for (let i = 0; i < 7; i++) b.box(0.36, 0.22, 0.1, i % 2 ? 0xffffff : 0xd62828, -1.1 + i * 0.37, 0.95, 0);
-  for (const s of [-1, 1]) {
-    b.box(0.1, 1.05, 0.1, 0x333333, s * 1.2, 0.52, 0);
-    b.box(0.6, 0.06, 0.4, 0x333333, s * 1.2, 0.03, 0);
-    b.cone(0.18, 0.6, 0xff6a00, s * 0.6, 0.3, 0.8, { seg: 8 });
-    b.box(0.3, 0.06, 0.3, 0xff6a00, s * 0.6, 0.03, 0.8);
-    b.box(0.26, 0.05, 0.05, 0xffffff, s * 0.6, 0.38, 0.95);
-  }
-  b.sphere(0.1, 0x2b6bff, -1.2, 1.12, 0, { kind: 'glow', seg: 6 });
-  b.sphere(0.1, 0xff2020, 1.2, 1.12, 0, { kind: 'glow', seg: 6 });
-  // the havaldar with his torch
-  b.box(0.16, 0.8, 0.18, 0x1a2a40, 1.75, 0.4, -0.1); b.box(0.16, 0.8, 0.18, 0x1a2a40, 1.95, 0.4, -0.1);
-  b.box(0.46, 0.7, 0.28, 0x2a3f5f, 1.85, 1.15, -0.1);
-  b.sphere(0.15, 0xa86d45, 1.85, 1.68, -0.1, { seg: 8 });
-  b.cyl(0.16, 0.17, 0.12, 0x1a2a40, 1.85, 1.83, -0.1, { seg: 8 });
-  b.box(0.07, 0.07, 0.4, 0xfff3c4, 1.55, 1.25, 0.05, { kind: 'glow' });
-  b.plane(3.2, 1.4, 'shadow', 0xffffff, [0, 0.03, 0.2], [-Math.PI / 2, 0, 0]);
-  return { group: b.build(), hw: 1.3, hl: 0.5, h: 1.2 };
-}
-
-// ---------- pickups ----------
 export function createPowerup(type, color, icon) {
   const g = new THREE.Group();
   const b = new Builder();
@@ -297,42 +273,7 @@ export function createGroundStain() {
 
 export { SHOPS, signUV, MATS };
 
-/** Roadside speed-limit sign (faces the oncoming rider). */
-export function createSpeedSign(limitIdx) {
-  const b = new Builder();
-  b.cyl(0.05, 0.05, 2.6, 0x888888, 0, 1.3, 0, { seg: 6, kind: 'shiny' });
-  b.plane(1.15, 1.15, 'limit', 0xffffff, [0, 2.75, 0.03], [0, 0, 0], { uv: limitUV(limitIdx) });
-  b.cyl(0.6, 0.6, 0.04, 0x333333, 0, 2.75, -0.01, { r: [Math.PI / 2, 0, 0], seg: 18 });
-  b.plane(0.9, 0.9, 'shadow', 0xffffff, [0, 0.03, 0], [-Math.PI / 2, 0, 0]);
-  return b.build();
-}
-
-/** Speed camera on a pole with a flash unit, and a traffic warden with his whistle. Stands on the right kerb. */
-export function createSpeedCamera() {
-  const b = new Builder();
-  b.box(0.16, 4.6, 0.16, 0x9aa0a8, 0, 2.3, 0, { kind: 'shiny' });
-  b.box(1.6, 0.12, 0.12, 0x9aa0a8, -0.75, 4.55, 0, { kind: 'shiny' });
-  b.box(0.42, 0.34, 0.6, 0x20242c, -1.45, 4.3, 0);                 // camera body
-  b.cyl(0.11, 0.11, 0.08, 0x0b0d12, -1.45, 4.3, 0.33, { r: [Math.PI / 2, 0, 0], seg: 12, kind: 'glass' });
-  b.box(0.3, 0.12, 0.05, 0xfff3c4, -1.45, 4.55, 0.31, { kind: 'glow' });   // flash
-  b.box(0.5, 0.5, 0.05, 0xffd60a, 0, 3.4, 0.1);                     // warning plate
-  b.box(0.36, 0.08, 0.06, 0x111111, 0, 3.4, 0.13);
-  // traffic warden: light-blue shirt, navy trousers, white cap, hand raised
-  const W = 0.9;
-  b.box(0.16, 0.8, 0.18, 0x1f2a44, W - 0.12, 0.4, 0.4); b.box(0.16, 0.8, 0.18, 0x1f2a44, W + 0.12, 0.4, 0.4);
-  b.box(0.46, 0.7, 0.28, 0x8fc1e8, W, 1.15, 0.4);
-  b.box(0.48, 0.06, 0.3, 0x1f2a44, W, 0.82, 0.4);
-  b.sphere(0.15, 0xa86d45, W, 1.68, 0.4, { seg: 8 });
-  b.cyl(0.17, 0.15, 0.1, 0xf5f5f5, W, 1.83, 0.4, { seg: 10 });
-  b.box(0.36, 0.03, 0.2, 0x111111, W, 1.79, 0.52);                  // cap peak
-  b.box(0.1, 0.6, 0.1, 0x8fc1e8, W - 0.3, 1.9, 0.4, { r: [0, 0, 0.3] });   // raised arm
-  b.box(0.1, 0.55, 0.1, 0x8fc1e8, W + 0.3, 1.12, 0.4);
-  b.box(0.2, 0.06, 0.03, 0xffd60a, W, 1.3, 0.55, { kind: 'glow' }); // reflective stripe
-  b.plane(1.6, 1.6, 'shadow', 0xffffff, [0.4, 0.03, 0.2], [-Math.PI / 2, 0, 0]);
-  return b.build();
-}
-
-/** Ammi's errand items, floating above the road with a gold ring. */
+/** Ammi's errand item floating over a lane. */
 export function createErrandItem(id) {
   const b = new Builder();
   if (id === 'dahi') { b.cyl(0.45, 0.32, 0.4, 0xb5563a, 0, 0, 0, { seg: 14 }); b.cyl(0.42, 0.42, 0.04, 0xfffaf0, 0, 0.2, 0, { seg: 14 }); }

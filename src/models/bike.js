@@ -69,6 +69,24 @@ function fallbackBody(skin) {
   return { group: g, wheels };
 }
 
+let shieldMat = null;
+/** Hexagon-shimmer shield bubble (shared shader). */
+export function makeShield() {
+  shieldMat ||= new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    uniforms: { t: { value: 0 }, col: { value: new THREE.Color(0x4fc3f7) }, a: { value: 1 } },
+    vertexShader: `varying vec3 vN; varying vec3 vV; varying vec3 vP;
+      void main(){ vN = normalize(normalMatrix*normal); vec4 mv = modelViewMatrix*vec4(position,1.0); vV = -mv.xyz; vP = position; gl_Position = projectionMatrix*mv; }`,
+    fragmentShader: `uniform float t; uniform vec3 col; uniform float a; varying vec3 vN; varying vec3 vV; varying vec3 vP;
+      void main(){ float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 2.5);
+        float hex = 0.5 + 0.5*sin(vP.y*14.0 - t*4.0)*sin(vP.x*14.0);
+        gl_FragColor = vec4(col, (f*0.9 + hex*0.08) * a); }`,
+  });
+  const shield = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 3), shieldMat);
+  shield.visible = false;
+  return shield;
+}
+
 /** Player / rival bike. */
 export function createBike(skin) {
   const root = new THREE.Group();
@@ -118,20 +136,9 @@ export function createBike(skin) {
   pitch.add(flame);
 
   // shield bubble
-  const shieldMat = new THREE.ShaderMaterial({
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    uniforms: { t: { value: 0 }, col: { value: new THREE.Color(0x4fc3f7) }, a: { value: 1 } },
-    vertexShader: `varying vec3 vN; varying vec3 vV; varying vec3 vP;
-      void main(){ vN = normalize(normalMatrix*normal); vec4 mv = modelViewMatrix*vec4(position,1.0); vV = -mv.xyz; vP = position; gl_Position = projectionMatrix*mv; }`,
-    fragmentShader: `uniform float t; uniform vec3 col; uniform float a; varying vec3 vN; varying vec3 vV; varying vec3 vP;
-      void main(){ float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 2.5);
-        float hex = 0.5 + 0.5*sin(vP.y*14.0 - t*4.0)*sin(vP.x*14.0);
-        gl_FragColor = vec4(col, (f*0.9 + hex*0.08) * a); }`,
-  });
-  const shield = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 3), shieldMat);
+  const shield = makeShield();
   shield.scale.set(0.85, 1.15, 1.35);
   shield.position.set(0, 1.0, 0);
-  shield.visible = false;
   tilt.add(shield);
 
   // headlight spot
@@ -141,7 +148,7 @@ export function createBike(skin) {
   root.add(head, head.target);
 
   const riderHead = custom ? findNode(custom.group, 'RiderHead') : null;
-  return { root, tilt, flip, pitch, body, wheels, passenger, flame, shield, head, riderHead };
+  return { root, tilt, flip, pitch, body, wheels, passenger, flame, shield, head, riderHead, kind: 'bike' };
 }
 
 /** Traffic bike (another Lahori on a 125), random paint + clothes, sometimes with a pillion. */
@@ -162,17 +169,3 @@ export function createTrafficBike() {
 }
 
 export { MATS };
-
-/** Police 125 with a flashing red/blue light bar on the rear carrier. */
-export function createPoliceBike() {
-  const m = createBike({ body: 0xf2f2f2, trim: 0x1a3c8f, kameez: 0x1f2a44 });
-  const red = new Builder(); red.box(0.16, 0.08, 0.1, 0xff1a1a, -0.1, 1.12, 0.85, { kind: 'glow' });
-  const blue = new Builder(); blue.box(0.16, 0.08, 0.1, 0x2b6bff, 0.1, 1.12, 0.85, { kind: 'glow' });
-  const bar = new Builder(); bar.box(0.4, 0.05, 0.14, 0x222222, 0, 1.06, 0.85);
-  const r = red.build(), bl = blue.build();
-  m.pitch.add(r, bl, bar.build());
-  [r, bl].forEach(g => g.position.add(m.body.position));
-  m.pitch.children.at(-1).position.add(m.body.position);
-  m.lights = { red: r, blue: bl };
-  return m;
-}

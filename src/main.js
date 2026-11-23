@@ -9,12 +9,13 @@ import { auth } from './core/auth.js';
 import { initInput } from './core/input.js';
 import { ensureDaily, describe, claim, applyRun, checkAchievements, ACHIEVEMENTS } from './core/challenges.js';
 import { buildTextures } from './render/textures.js';
-import { initMaterials, pick } from './render/kit.js';
+import { initMaterials, pick, MATS } from './render/kit.js';
 import { loadCustomModels } from './render/gltf.js';
 import { Environment } from './render/sky.js';
 import { Weather } from './render/weather.js';
 import { Particles } from './render/fx.js';
 import { Post } from './render/post.js';
+import { beginCull, cullChildren } from './render/cull.js';
 import { World } from './game/world.js';
 import { Player } from './game/player.js';
 import { Coins } from './game/coins.js';
@@ -37,6 +38,7 @@ boot();
 async function boot() {
   ui.init();
   ui.initJuice();
+  document.body.classList.toggle('touch', isTouch);
   ui.show('loading');
   try { await Promise.race([document.fonts.load('500 40px "Noto Nastaliq Urdu"'), new Promise(r => setTimeout(r, 1800))]); } catch { /* offline */ }
 
@@ -45,6 +47,7 @@ async function boot() {
   await loadCustomModels(); // optional Blender .glb overrides
 
   renderer = new THREE.WebGLRenderer({ canvas: $('game'), antialias: true, powerPreference: 'high-performance' });
+  renderer.info.autoReset = false;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
   scene = new THREE.Scene();
@@ -58,7 +61,8 @@ async function boot() {
   post = new Post(renderer, scene, camera);
   applyStartDistrict();
   world = new World(scene);
-  player = new Player(scene, skinById(save.skin));
+  player = new Player(scene, skinById(save.skin), save.vehicle);
+  audio.setEngineType(save.vehicle);
   coins = new Coins(scene);
   world.onStruct = name => { if (state === 'playing') ui.toast(name, 1800); };
   run = new Run({ scene, world, player, coins, fx, weather, env, ui, camera, onEnd: onGameOver });
@@ -78,16 +82,53 @@ async function boot() {
 
   // ?demo — expose internals for the scripted trailer capture (no effect otherwise)
   if (new URLSearchParams(location.search).has('demo')) {
-    window.__rr = { run, env, player, world, weather, save, startRun, goMenu, applyStartDistrict, ui, route, PLACES, audio, get state() { return state; } };
+    window.__rr = { run, env, player, world, weather, save, startRun, goMenu, applyStartDistrict, ui, route, PLACES, audio, renderer, post, scene, camera, dyn, get state() { return state; } };
   }
   goMenu();
-  renderer.compile(scene, camera);
+  warmup();
   requestAnimationFrame(loop);
 
   // Clerk login (non-blocking — the game is playable as a guest immediately)
   $('userbar').classList.remove('hidden');
   if (auth.enabled) auth.init(onAuth).then(() => onAuth(auth.user));
   else onAuth(null);
+}
+
+/** Compile every shader and upload every traffic model once, behind the loading screen, so the first
+ *  truck / rickshaw / rain shower / canal never freezes the game while you ride. */
+function warmup() {
+  const made = run.prewarm();
+  const swatches = new THREE.Group();
+  const mats = new Set(Object.values(MATS));
+  let i = 0;
+  for (const m of mats) {
+    const g = new THREE.PlaneGeometry(1, 1);
+    const n = g.attributes.position.count;
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3).fill(1), 3));
+    g.setAttribute('rm', new THREE.BufferAttribute(new Float32Array(n * 3).fill(0.5), 3));
+    const mesh = new THREE.Mesh(g, m);
+    mesh.frustumCulled = false;
+    mesh.position.set((i++ % 8) - 4, 1, -6);
+    swatches.add(mesh);
+  }
+  scene.add(swatches);
+  const vis = [MATS.pool.visible, MATS.beamSoft.visible];
+  MATS.pool.visible = MATS.beamSoft.visible = true;
+  weather.lines.visible = true;
+  // instanced coins + particles only reach the GPU when something is drawn: give them one each
+  coins.add(14, 0, 0.9); coins.update(0, 0, player, false);
+  fx.emit(0, 1, -6, 4, { color: 0xffffff, life: 0.2 }); fx.update(0.001, 0);
+  camera.position.set(0, 4, 9); camera.lookAt(0, 1, -10);
+  try {
+    renderer.compile(scene, camera);
+    post.render(0, 0);
+  } catch (e) { console.warn('warmup', e); }
+  [MATS.pool.visible, MATS.beamSoft.visible] = vis;
+  weather.lines.visible = false;
+  coins.clear();
+  scene.remove(swatches);
+  swatches.traverse(o => o.geometry?.dispose());
+  run.endPrewarm(made);
 }
 
 /** True while a run is suspended behind a screen (pause, game over, or a sub-screen opened from those). */
@@ -122,10 +163,35 @@ function applySettings() {
   audio.setVolume(s.volume);
   audio.setMusic(s.music);
   audio.setMuted(s.muted);
-  const high = s.quality === 'high' || (s.quality === 'auto' && !isTouch);
-  renderer.setPixelRatio(Math.min(devicePixelRatio, high ? 2 : 1.25));
-  post.setEnabled(high);
+  // resolution range; the adaptive controller below picks the sharpest one that still holds ~60 fps
+  const q = s.quality;
+  const dpr = devicePixelRatio || 1;
+  dyn.max = Math.min(dpr, q === 'high' ? 2 : q === 'low' ? 1 : isTouch ? 1.6 : 1.5);
+  dyn.min = Math.min(dyn.max, q === 'low' ? 0.6 : isTouch ? 0.75 : 0.8);
+  dyn.pr = dyn.max;
+  dyn.slowT = 0; dyn.acc = 0; dyn.n = 0;
+  renderer.setPixelRatio(dyn.pr);
+  post.setEnabled(q === 'high');
   resize();
+}
+
+/** Dynamic resolution: drop the render scale when frames run long, creep back up when there's headroom. */
+const dyn = { pr: 1, min: 0.75, max: 1.5, acc: 0, n: 0, t: 0, slowT: 0, upT: 0 };
+function adaptQuality(dtMs, active) {
+  if (!active || dtMs > 120) return;              // ignore hitches and frozen screens
+  dyn.acc += dtMs; dyn.n++; dyn.t += dtMs;
+  if (dyn.t < 1000) return;
+  const avg = dyn.acc / dyn.n;
+  dyn.acc = 0; dyn.n = 0; dyn.t = 0;
+  dyn.upT += 1;
+  let pr = dyn.pr;
+  if (avg > 19.5 && pr > dyn.min) { pr = Math.max(dyn.min, pr * (avg > 28 ? 0.8 : 0.9)); dyn.upT = 0; dyn.slowT++; }
+  else if (avg < 17.4 && pr < dyn.max && dyn.upT > 6 + dyn.slowT * 4) { pr = Math.min(dyn.max, pr * 1.08); dyn.upT = 0; }
+  if (Math.abs(pr - dyn.pr) > 0.01) {
+    dyn.pr = pr;
+    renderer.setPixelRatio(pr);
+    resize();
+  }
 }
 
 function resize() {
@@ -144,7 +210,8 @@ function framing() {
   const wide = camera.aspect > 1.2;
   if (state === 'menu' && wide) camera.setViewOffset(w, h, -w * 0.18, 0, w, h);
   else if (state === 'garage' && wide) camera.setViewOffset(w, h, w * 0.2, 0, w, h);
-  else if ((state === 'menu' || state === 'garage') && !wide) camera.setViewOffset(w, h, 0, h * 0.3, w, h);
+  else if ((state === 'menu' || state === 'garage') && !wide) camera.setViewOffset(w, h, 0, h * 0.27, w, h);
+  else if (state === 'playing' && h > w) camera.setViewOffset(w, h, 0, -h * 0.07, w, h);   // phone: ride sits lower, more road ahead
   else camera.clearViewOffset();
   camera.updateProjectionMatrix();
 }
@@ -197,8 +264,6 @@ function initInstall() {
 function refreshMenu() {
   $('menu-high').textContent = save.high.toLocaleString();
   $('menu-coins').textContent = save.coins.toLocaleString();
-  $('menu-debt').textContent = save.debt > 0 ? `Udhaar Rs ${save.debt.toLocaleString()}` : '';
-  $('menu-debt').classList.toggle('hidden', !(save.debt > 0));
   const d = ensureDaily();
   $('badge-ch').classList.toggle('hidden', !d.list.some(c => c.done && !c.claimed));
   $('badge-spin').classList.toggle('hidden', save.spinDate === today());
@@ -207,6 +272,19 @@ function refreshMenu() {
   $('start-name').textContent = di.name;
   $('start-count').textContent = `${save.unlocked.length}/${PLACES.length} jagah`;
   $('time-name').textContent = (TIMES.find(t => t[0] === save.settings.startTime) || TIMES[0])[1];
+  document.querySelectorAll('[data-ride]').forEach(b => { const on = b.dataset.ride === save.vehicle; b.classList.toggle('active', on); b.setAttribute('aria-checked', on); });
+  $('btn-wheelie').textContent = save.vehicle === 'rickshaw' ? '🛺' : '🏍️';
+}
+
+/** Switch between the 125 and the rickshaw. */
+function setRide(id) {
+  if (id === save.vehicle) return;
+  save.vehicle = id; persist();
+  player.setVehicle(id, skinById(previewSkin || save.skin));
+  audio.setEngineType(id);
+  audio.rev();
+  refreshMenu();
+  ui.toast(id === 'rickshaw' ? '🛺 Rickshaw tayyar — do pahiye te chala ke vikha!' : '🏍️ 125 tayyar — wheelie maar bhaji!', 1600);
 }
 
 function goMenu() {
@@ -266,7 +344,6 @@ function pause() {
   setState('paused');
   ui.show('pause');
   audio.engine(0, 0, false);
-  audio.setSiren(0);
   audio.ambience(null, null, false, 0);
   audio.setMode('calm');
 }
@@ -283,11 +360,6 @@ function commitRun() {
   for (const k of Object.keys(st)) delta[k] = (st[k] || 0) - (committed.stats[k] || 0);
   const coinsDelta = run.coinsRun - committed.coins;
   save.coins += coinsDelta;
-  if (save.debt > 0 && save.coins > 0) {           // udhaar is cleared first from whatever you earn
-    const pay = Math.min(save.debt, save.coins);
-    save.debt -= pay; save.coins -= pay;
-    committed.repaid = (committed.repaid || 0) + pay;
-  }
   const score = Math.floor(run.score);
   const isHigh = score > save.high;
   save.high = Math.max(save.high, score);
@@ -303,7 +375,7 @@ function commitRun() {
   S.distance += delta.distance; S.coins += coinsDelta; S.fares += delta.fares; S.smash += delta.smash;
   S.tricks += delta.tricks; S.nearMiss += delta.nearMiss; S.powerups += delta.powerups; S.gates += delta.gates;
   S.kites = (S.kites || 0) + (delta.kites || 0); S.wheelies = (S.wheelies || 0) + (delta.wheelies || 0);
-  for (const k of ['challans', 'escapes', 'errands', 'cleanCams']) S[k] = (S[k] || 0) + (delta[k] || 0);
+  S.errands = (S.errands || 0) + (delta.errands || 0);
   S.bestDistance = Math.max(S.bestDistance, st.distance);
   S.maxSpeed = Math.max(S.maxSpeed, st.maxSpeed);
   save.rivalsBeaten += delta.rivals || 0;
@@ -337,16 +409,25 @@ function onGameOver() {
   $('go-kites').textContent = st.kites;
   $('go-wheelies').textContent = st.wheelies;
   $('go-place').textContent = placeAt(run.D).name;
-  $('go-challans').textContent = st.challans ? `${st.challans} (Rs ${st.finesRs})` : '0 — shareef! 😇';
-  $('go-escapes').textContent = st.escapes;
-  $('go-debt').textContent = save.debt > 0 ? `Udhaar baqi: Rs ${save.debt.toLocaleString()}` : committed.repaid ? `Udhaar ada: Rs ${committed.repaid.toLocaleString()} ✓` : '';
-  committed.repaid = 0;
   $('go-errands').textContent = st.errands;
   $('go-speed').textContent = `${Math.round(st.maxSpeed * 3.6)} km/h`;
-  $('go-line').textContent = pick(LINES.gameOver);
+  const rk = save.vehicle === 'rickshaw';
+  $('go-title').textContent = rk ? 'Siyapa Pe Gaya! 🛺💥' : 'Siyapa Pe Gaya! 🏍️💥';
+  $('go-line').textContent = pick(LINES.gameOver).replace('Bike', rk ? 'Rickshaw' : 'Bike');
   $('go-unlocks').innerHTML = achievements.map(a => `<div class="unlock">🏅 ${a.name} <small>${a.desc}</small></div>`).join('');
   $('btn-revive').classList.toggle('hidden', run.revived || save.coins < REVIVE_COST);
   $('revive-cost').textContent = REVIVE_COST;
+  // "one more go": how close was the record?
+  const score = Math.floor(run.score), prev = run.recordScore || 0;
+  const bestEl = $('go-best');
+  bestEl.classList.toggle('record', isHigh);
+  if (isHigh) { $('go-best-text').textContent = prev > 0 ? `🏆 Purana record ${prev.toLocaleString()} — tod ditta!` : '🏆 Pehla record ban gaya!'; $('go-best-bar').style.width = '100%'; }
+  else {
+    const gap = save.high - score, frac = save.high ? score / save.high : 0;
+    $('go-best-text').textContent = frac > 0.8 ? `Record ton sirf ${gap.toLocaleString()} peechay — bas ik vaari hor! 💪` : `Record ${save.high.toLocaleString()} — tu ${Math.round(frac * 100)}% tak pohnch gaya`;
+    $('go-best-bar').style.width = Math.min(100, frac * 100) + '%';
+  }
+  $('go-place').textContent = `${placeAt(run.D).name}`;
 }
 
 function revive() {
@@ -446,6 +527,7 @@ function bindUI() {
     refreshMenu();
   };
   $('time-prev').addEventListener('click', () => stepTime(-1));
+  document.querySelectorAll('[data-ride]').forEach(b => b.addEventListener('click', () => { primeAudio(); setRide(b.dataset.ride); }));
   $('time-next').addEventListener('click', () => stepTime(1));
 
   // auth
@@ -732,18 +814,22 @@ function emitTrail(dt) {
 }
 
 // ---------------------------------------------------------------- loop
-let last = performance.now(), fpsT = 0, frames = 0, fps = 0;
+let last = performance.now(), fpsT = 0, frames = 0, fps = 0, dtS = 1 / 60;
 function loop(now) {
   requestAnimationFrame(loop);
-  const dt = Math.min(0.05, (now - last) / 1000);
+  const raw = Math.min(0.05, (now - last) / 1000);
   last = now;
-  frames++; fpsT += dt;
+  adaptQuality(raw * 1000, !frozen() && !document.hidden);
+  // smooth out frame-pacing jitter (common on phones) so motion doesn't judder; real hitches pass through
+  dtS += (raw - dtS) * 0.25;
+  const dt = Math.abs(raw - dtS) < 0.008 ? dtS : raw;
+  frames++; fpsT += raw;
   if (fpsT >= 0.5) { fps = Math.round(frames / fpsT); frames = 0; fpsT = 0; }
 
   let worldSpeed = 0;
   if (state === 'playing') {
     run.update(dt);
-    world.update(run.D, dt);
+    world.update(run.D, dt * run.timeScale);
     run.gear = audio.gear;
     run.placeName = placeAt(run.D).name;
     worldSpeed = run.speed;
@@ -771,14 +857,20 @@ function loop(now) {
 
   env.update(camera, weather.rain, dt, weather.dust);
   weather.update(frozen() ? 0 : dt, worldSpeed, camera.position.x, env.night);
-  fx.update(state === 'paused' ? 0 : dt, frozen() ? 0 : worldSpeed);
+  const ts = state === 'playing' ? run.timeScale : 1;
+  fx.update(state === 'paused' ? 0 : dt * ts, frozen() ? 0 : worldSpeed);
   player.model.head.intensity = env.night * 16 + weather.level * 5;
   updateCamera(dt);
+  beginCull(camera);
+  const far = scene.fog.far + 15;
+  cullChildren(world.root, far, Math.min(far, 100));
+  cullChildren(run.root, far, Math.min(far, 120));
+  renderer.info.reset();
   post.render(env.night, (run.nitroOn || run.headstart > 0 || run.fever > 0) && state === 'playing' ? 1 : 0);
 
   if (!$('debug').classList.contains('hidden')) {
     const info = renderer.info.render;
-    $('debug').textContent = `fps ${fps}\ncalls ${info.calls}\ntris ${info.triangles}\nobs ${run.obs.length}\nD ${Math.floor(run.D || menuD)}\ntod ${env.tod.toFixed(2)}`;
+    $('debug').textContent = `fps ${fps}\npr ${dyn.pr.toFixed(2)}\ncalls ${info.calls}\ntris ${info.triangles}\nobs ${run.obs.length}\nD ${Math.floor(run.D || menuD)}\ntod ${env.tod.toFixed(2)}`;
   }
 }
 
@@ -788,9 +880,10 @@ function updateCamera(dt) {
   if (state === 'playing' || frozen()) {
     const sf = Math.max(0, (run.speed - 18) / 28);
     const portrait = innerHeight > innerWidth;
-    fov = (portrait ? 72 : 60) + sf * 9 + (run.nitroOn || run.headstart > 0 ? 8 : 0);
-    camPos.set(p.x * 0.6, (portrait ? 4.3 : 3.3) + p.y * 0.45, (portrait ? 8.2 : 6.9) - sf * 0.6);
-    camLook.set(p.x * 0.85, 1.05 + p.y * 0.55, -14);
+    const rk = p.isRickshaw ? 1 : 0;
+    fov = (portrait ? 70 : 60) + sf * 9 + (run.nitroOn || run.headstart > 0 ? 8 : 0) - (1 - (run.timeScale ?? 1)) * 14;
+    camPos.set(p.x * 0.6, (portrait ? 4.0 : 3.3) + rk * 0.45 + p.y * 0.45, (portrait ? 8.0 : 6.9) + rk * 0.9 - sf * 0.6);
+    camLook.set(p.x * 0.85, 1.05 + rk * 0.25 + p.y * 0.55, -14);
     camera.position.lerp(camPos, Math.min(1, dt * 6));
     const sh = save.settings.shake ? run.shake : 0;
     if (sh > 0 && state === 'playing') {
@@ -802,12 +895,14 @@ function updateCamera(dt) {
     // garage: slow turntable orbit; menus: cinematic 3/4 view from behind so the street opens up ahead
     orbit += dt * (state === 'garage' ? 0.35 : 0.1);
     if (state === 'garage') {
-      camPos.set(Math.sin(orbit) * 4.0, 1.8, Math.cos(orbit) * 4.0);
-      camLook.set(0, 0.85, 0);
+      const R = player.isRickshaw ? 5.4 : 4.0;
+      camPos.set(Math.sin(orbit) * R, player.isRickshaw ? 2.3 : 1.8, Math.cos(orbit) * R);
+      camLook.set(0, player.isRickshaw ? 1.1 : 0.85, 0);
     } else {
       // stay above the road (|x| < 3.6) so the camera never clips into shop fronts
-      camPos.set(1.9 + Math.sin(orbit) * 0.9, 2.3 + Math.sin(orbit * 0.7) * 0.25, 5.6 + Math.cos(orbit * 0.8) * 0.6);
-      camLook.set(-0.5, 1.0, -7);
+      const k = player.isRickshaw ? 1.35 : 1;      // the rickshaw is bigger: pull the camera back
+      camPos.set((1.9 + Math.sin(orbit) * 0.9) * k, (2.3 + Math.sin(orbit * 0.7) * 0.25) * k, (5.6 + Math.cos(orbit * 0.8) * 0.6) * k);
+      camLook.set(-0.5, player.isRickshaw ? 1.2 : 1.0, -7);
     }
     camera.position.lerp(camPos, Math.min(1, dt * 3));
     camera.lookAt(camLook);
