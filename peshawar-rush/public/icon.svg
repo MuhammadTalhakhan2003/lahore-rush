@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Peshawar Rush — a truck-art chingchi racing under Bab-e-Khyber">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f9d77e"/><stop offset=".5" stop-color="#f0954a"/><stop offset="1" stop-color="#b8402b"/></linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbe39a"/><stop offset=".5" stop-color="#e0b04a"/><stop offset="1" stop-color="#a8761f"/></linearGradient>
+    <radialGradient id="sun" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff4cf"/><stop offset=".6" stop-color="#ffe19a" stop-opacity=".9"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient>
+    <clipPath id="arch"><path d="M120 420 V232 C120 168 188 126 256 62 C324 126 392 168 392 232 V420 Z"/></clipPath>
+  </defs>
+  <circle cx="256" cy="256" r="248" fill="#06261a"/>
+  <circle cx="256" cy="256" r="234" fill="none" stroke="url(#gold)" stroke-width="7"/>
+  <circle cx="256" cy="256" r="222" fill="none" stroke="#e0b04a" stroke-width="1.5" stroke-dasharray="2 7" stroke-linecap="round"/>
+  <g clip-path="url(#arch)">
+    <rect x="110" y="56" width="292" height="376" fill="url(#sky)"/>
+    <circle cx="256" cy="296" r="96" fill="url(#sun)"/>
+    <!-- Bala Hisar fort + Mahabat Khan minarets -->
+    <g fill="#5a3b24">
+      <path d="M120 330 h272 v-30 h-10 v8 h-10 v-8 h-10 v8 h-10 v-8 h-10 v8 h-10 v-8 h-10 v8 h-10 v-8 h-10 v8 h-10 v-8 h-10 v8 h-10 v-8 h-10 v8 h-10 v-8 h-10 v8 h-10 v-8 h-10 v8 h-10 v-8 h-10 v8 h-10 v-8 h-10 v8 h-10 v-8 h-10 v8 h-10 v-8 h-10 z"/>
+    </g>
+    <rect x="150" y="262" width="26" height="70" fill="#6a4529"/><ellipse cx="163" cy="262" rx="13" ry="6" fill="#6a4529"/>
+    <rect x="336" y="262" width="26" height="70" fill="#6a4529"/><ellipse cx="349" cy="262" rx="13" ry="6" fill="#6a4529"/>
+    <rect x="230" y="236" width="8" height="96" fill="#efe6d2"/><circle cx="234" cy="232" r="9" fill="#2f7f55"/>
+    <rect x="274" y="236" width="8" height="96" fill="#efe6d2"/><circle cx="278" cy="232" r="9" fill="#2f7f55"/>
+    <path d="M238 330 v-36 a18 18 0 0 1 36 0 v36z" fill="#efe6d2"/><circle cx="256" cy="288" r="17" fill="#2f7f55" opacity=".85"/>
+    <!-- road -->
+    <path d="M110 420 L218 330 H294 L402 420 Z" fill="#2b2b30"/>
+    <path d="M256 335 v82" stroke="#f2c14e" stroke-width="3" stroke-dasharray="12 10"/>
+  </g>
+  <path d="M120 420 V232 C120 168 188 126 256 62 C324 126 392 168 392 232 V420" fill="none" stroke="url(#gold)" stroke-width="8"/>
+  <!-- chingchi -->
+  <g transform="translate(176 316)">
+    <ellipse cx="84" cy="96" rx="82" ry="9" fill="#000" opacity=".35"/>
+    <rect x="46" y="12" width="110" height="10" rx="4" fill="#1a1a1a"/>
+    <g fill="#d62828"><rect x="48" y="22" width="8" height="12"/><rect x="66" y="22" width="8" height="12"/><rect x="84" y="22" width="8" height="12"/><rect x="102" y="22" width="8" height="12"/><rect x="120" y="22" width="8" height="12"/><rect x="138" y="22" width="8" height="12"/></g>
+    <g fill="#f2c14e"><rect x="57" y="22" width="8" height="12"/><rect x="75" y="22" width="8" height="12"/><rect x="93" y="22" width="8" height="12"/><rect x="111" y="22" width="8" height="12"/><rect x="129" y="22" width="8" height="12"/></g>
+    <rect x="52" y="34" width="5" height="44" fill="#dedede"/><rect x="146" y="34" width="5" height="44" fill="#dedede"/><rect x="98" y="34" width="5" height="44" fill="#dedede"/>
+    <rect x="46" y="58" width="112" height="30" rx="5" fill="#0b7a3e"/>
+    <rect x="46" y="58" width="112" height="6" fill="#f2c14e"/>
+    <g fill="#f2c14e"><circle cx="66" cy="75" r="5"/><circle cx="84" cy="75" r="5"/><circle cx="102" cy="75" r="5"/><circle cx="120" cy="75" r="5"/><circle cx="138" cy="75" r="5"/></g>
+    <circle cx="70" cy="46" r="8" fill="#c8946a"/><rect x="62" y="36" width="16" height="6" rx="3" fill="#c9b184"/>
+    <circle cx="114" cy="48" r="7" fill="#c8946a"/><rect x="108" y="40" width="12" height="4" rx="2" fill="#efe6d2"/>
+    <path d="M44 66 L22 62 L10 80 L36 84 Z" fill="#0b7a3e"/>
+    <rect x="8" y="64" width="26" height="6" fill="#dedede" transform="rotate(-8 20 68)"/>
+    <circle cx="20" cy="94" r="14" fill="#151515"/><circle cx="20" cy="94" r="7" fill="#dedede"/>
+    <circle cx="70" cy="94" r="14" fill="#151515"/><circle cx="70" cy="94" r="7" fill="#dedede"/>
+    <circle cx="140" cy="94" r="14" fill="#151515"/><circle cx="140" cy="94" r="7" fill="#dedede"/>
+    <circle cx="4" cy="66" r="6" fill="#fff3c4"/>
+  </g>
+  <!-- title ribbon -->
+  <path d="M96 408 H416 V464 H96 Z" fill="#0a4a2c"/><path d="M96 408 H416" stroke="url(#gold)" stroke-width="4"/><path d="M96 464 H416" stroke="url(#gold)" stroke-width="4"/>
+  <text x="256" y="448" text-anchor="middle" font-family="Georgia, 'Playfair Display', serif" font-weight="900" font-size="34" fill="#fbe39a" letter-spacing="2">PESHAWAR RUSH</text>
+</svg>

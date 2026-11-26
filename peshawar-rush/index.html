@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#06261a" />
+  <meta name="description" content="Peshawar Rush — a 3D endless runner through 37 real places of Peshawar on a truck-art chingchi. Two-wheel stunts, backflips, patang kites and Peshawari swag." />
+  <title>Peshawar Rush</title>
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Peshawar Rush — chingchi pe poora Peshawar, browser mein" />
+  <meta property="og:description" content="Ride the Peshawar chingchi through Qissa Khwani, Bala Hisar, Mahabat Khan Masjid, Saddar and Bab-e-Khyber. Endless, free, no install." />
+  <meta property="og:url" content="https://peshawar-rush.vercel.app/" />
+  <meta property="og:image" content="https://peshawar-rush.vercel.app/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://peshawar-rush.vercel.app/og.png" />
+  <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+  <link rel="preload" href="/logo.svg" as="image" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Playfair+Display:ital,wght@0,700;0,900;1,400&family=Noto+Nastaliq+Urdu:wght@500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+  <script>
+    // Catch the install prompt as early as possible (it can fire before the game boots) + register the service worker.
+    window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.__installPrompt = e; window.dispatchEvent(new Event('install-available')); });
+    if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
+  </script>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div id="speedlines"></div>
+  <div id="fever"></div>
+  <div id="vignette"></div>
+  <div id="flash"></div>
+
+  <!-- ===== HUD ===== -->
+  <div id="hud" class="hidden">
+    <div class="hud-top">
+      <div class="hud-left">
+        <div class="place-chip"><small>📍</small><b id="hud-place">Qissa Khwani Bazaar</b><i id="hud-tod" class="tod-chip subah"><span>🌅</span>Subah</i></div>
+        <div class="pill score">
+          <div class="score-row"><small>SCORE</small><i id="hud-mult" class="mult hidden">x1</i></div>
+          <b id="hud-score">0</b>
+          <span class="dist"><span class="dist-ic">📍</span><b id="hud-dist">0</b> m</span>
+        </div>
+      </div>
+      <div class="hud-mid">
+        <div id="hud-letters"></div>
+        <div id="hud-errand" class="hidden"></div>
+        <div id="hud-race" class="hidden"><span>🏍️ Gul Khan Wheelie</span><b id="hud-race-gap">0m</b><i><em id="hud-race-bar"></em></i></div>
+        <div id="hud-mission" class="hidden">
+          <span id="hud-mission-text"></span><b id="hud-mission-time"></b>
+          <i><em id="hud-mission-bar"></em></i>
+        </div>
+      </div>
+      <div class="hud-right">
+        <div class="pill coins"><span class="coin-dot">Rs</span><b id="hud-coins">0</b></div>
+        <div id="hud-lives" class="pill lives"></div>
+        <button id="btn-pause" class="icon-btn" aria-label="Pause">❚❚</button>
+      </div>
+    </div>
+    <div class="hud-bottom">
+      <div id="hud-powers"></div>
+      <div class="nitro-wrap">
+        <div class="nitro-label">NITRO <small>Shift / N</small></div>
+        <div class="nitro-bar"><i id="hud-nitro"></i><span class="tick"></span></div>
+      </div>
+      <div id="speedo" class="speedo">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <defs>
+            <linearGradient id="sg" x1="0" y1="1" x2="1" y2="1"><stop offset="0" stop-color="#f3d27a"/><stop offset=".65" stop-color="#ff9a3c"/><stop offset="1" stop-color="#ff3b3b"/></linearGradient>
+            <radialGradient id="sface" cx=".5" cy=".42" r=".6"><stop offset="0" stop-color="#3a1018"/><stop offset="1" stop-color="#14060a"/></radialGradient>
+          </defs>
+          <circle cx="60" cy="60" r="57" fill="url(#sface)" stroke="#d4a23a" stroke-width="1.6"/>
+          <circle cx="60" cy="60" r="52.5" fill="none" stroke="rgba(243,210,122,.18)" stroke-width=".8"/>
+          <g stroke="rgba(255,240,210,.45)" stroke-width="1.6" stroke-linecap="round">
+            <line x1="60" y1="9.5" x2="60" y2="13.5" transform="rotate(-120 60 60)"/><line x1="60" y1="9.5" x2="60" y2="13.5" transform="rotate(-80 60 60)"/>
+            <line x1="60" y1="9.5" x2="60" y2="13.5" transform="rotate(-40 60 60)"/><line x1="60" y1="9.5" x2="60" y2="13.5"/>
+            <line x1="60" y1="9.5" x2="60" y2="13.5" transform="rotate(40 60 60)"/><line x1="60" y1="9.5" x2="60" y2="13.5" transform="rotate(80 60 60)"/>
+            <line x1="60" y1="9.5" x2="60" y2="13.5" transform="rotate(120 60 60)"/>
+          </g>
+          <path d="M 21.9 82 A 44 44 0 1 1 98.1 82" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="7" stroke-linecap="round"/>
+          <path id="speedo-arc" d="M 21.9 82 A 44 44 0 1 1 98.1 82" fill="none" stroke="url(#sg)" stroke-width="7" stroke-linecap="round" pathLength="100" stroke-dasharray="0 100"/>
+          <g id="speedo-tip" transform="rotate(-120 60 60)"><circle cx="60" cy="16" r="5.2" fill="#fff" stroke="#ff9a3c" stroke-width="2"/></g>
+        </svg>
+        <div class="speedo-mid"><b id="hud-speed">0</b><small>KM/H</small></div>
+        <div class="gear"><small>G</small><b id="hud-gear">1</b></div>
+      </div>
+    </div>
+    <div id="hud-boosts" class="hidden"></div>
+    <button id="hud-radio" class="radio-chip"><span id="radio-now">📻 Dhol FM 102</span><small>R — next</small></button>
+    <div id="touch-pad" class="hidden">
+      <button id="btn-horn" class="round horn" aria-label="Horn">📯</button>
+      <button id="btn-wheelie" class="round wheelie" aria-label="Stunt">🏍️</button>
+      <button id="btn-nitro" class="round nitro" aria-label="Nitro"><span>⚡</span></button>
+    </div>
+  </div>
+
+  <div id="popups"></div>
+  <div id="toast"></div>
+  <div id="bubble"><span id="bubble-text"></span></div>
+  <div id="district">
+    <small id="district-tag"></small>
+    <b id="district-name"></b>
+    <span id="district-urdu" lang="ur" dir="rtl"></span>
+    <em id="district-bonus"></em>
+  </div>
+
+  <!-- ===== Screens ===== -->
+  <section id="screen-loading" class="screen">
+    <div class="loader">
+      <img class="loader-logo" src="/logo.svg" alt="Peshawar Rush" width="240" height="240" />
+      <p class="loader-urdu" lang="ur" dir="rtl">پشاور پشاور اے</p>
+      <div class="loader-bar"><i></i></div>
+      <p class="loader-text">Kick maar rahe hain… dhak dhak dhak</p>
+    </div>
+  </section>
+
+  <div id="userbar" class="hidden">
+    <span id="user-hello"></span>
+    <button class="chip" id="btn-login">🔑 Login</button>
+    <button class="chip gold" id="btn-signup">✨ Sign up</button>
+    <button class="chip hidden" id="btn-profile">👤 Profile</button>
+    <button class="chip hidden" id="btn-logout">Logout</button>
+  </div>
+
+  <section id="screen-menu" class="screen hidden left">
+    <div class="panel glow-border menu-panel">
+      <img class="menu-logo" src="/logo.svg" alt="" width="150" height="150" />
+      <h1 class="sr-only">Peshawar Rush</h1>
+      <p class="urdu-title" lang="ur" dir="rtl">پشاور پشاور اے</p>
+      <p class="tagline" id="menu-tip"></p>
+      <button class="btn big shimmer" data-act="play" id="btn-play">▶ Kick maar lala!</button>
+      <div class="ride-pick" role="radiogroup" aria-label="Sawari">
+        <button data-ride="chingchi" role="radio"><span>🛺</span><b>Chingchi</b><small>Do pahiya stunt</small></button>
+        <button data-ride="bike" role="radio"><span>🏍️</span><b>125</b><small>Wheelie · backflip</small></button>
+      </div>
+      <div class="pick-row">
+      <div class="start-pick">
+        <button class="arrow" id="start-prev" aria-label="Previous location">◀</button>
+        <div><small>START · <span id="start-count"></span></small><b id="start-name">Qissa Khwani Bazaar</b></div>
+        <button class="arrow" id="start-next" aria-label="Next location">▶</button>
+      </div>
+      <div class="start-pick time-pick">
+        <button class="arrow" id="time-prev" aria-label="Previous time">◀</button>
+        <div><small>WAQT</small><b id="time-name">🌅 Subah</b></div>
+        <button class="arrow" id="time-next" aria-label="Next time">▶</button>
+      </div>
+      </div>
+      <div class="tiles">
+        <button class="tile" data-act="garage"><span>🛠️</span>Garage</button>
+        <button class="tile" data-act="challenges"><span>🏆</span>Challenges<i id="badge-ch" class="badge hidden">!</i></button>
+        <button class="tile" data-act="spin"><span>🎡</span>Lucky Spin<i id="badge-spin" class="badge hidden">1</i></button>
+        <button class="tile" data-act="radio"><span>📻</span>Radio</button>
+        <button class="tile" data-act="settings"><span>⚙️</span>Settings</button>
+        <button class="tile" data-act="howto"><span>❔</span>How to</button>
+      </div>
+      <div id="install-card" class="install-card hidden">
+        <div class="install-ic">📲</div>
+        <div class="install-txt"><b>Install Peshawar Rush</b><small id="install-sub">Home screen ya desktop pe — offline bhi chalta ae, bilkul free.</small></div>
+        <button class="btn sm" id="btn-install">Install</button>
+      </div>
+      <div class="stats">
+        <div>Best <b id="menu-high">0</b></div>
+        <div>Wallet <b><span class="coin-dot sm">Rs</span> <span id="menu-coins">0</span></b></div>
+        <button class="link-btn" data-act="about"><i>i</i>About</button>
+      </div>
+    </div>
+  </section>
+
+  <footer id="credits-bar">
+    <span>Made in Pakistan <svg class="flag" viewBox="0 0 30 20" aria-label="Pakistan"><rect width="30" height="20" fill="#01411c"/><rect width="7.5" height="20" fill="#fff"/><circle cx="19" cy="10" r="5.2" fill="#fff"/><circle cx="20.4" cy="8.9" r="4.4" fill="#01411c"/><polygon points="22.6,6.2 23.1,7.6 24.6,7.6 23.4,8.5 23.9,9.9 22.6,9.0 21.4,9.9 21.9,8.5 20.6,7.6 22.1,7.6" fill="#fff"/></svg></span>
+    <span>Developer: <a href="https://muhammadtalhakhan2003.github.io/PortFolio_Talha/" target="_blank" rel="noopener">Muhammad Talha Khan ↗</a></span>
+    <em>Is game ko banate hue koi chingchi wala zakhmi nahi hua — bas developer ki neend aur kehwa qurbaan hue. 😴🍵</em>
+  </footer>
+
+  <section id="screen-garage" class="screen hidden right">
+    <div class="panel wide">
+      <h2>Garage</h2>
+      <div class="wallet"><span class="coin-dot">Rs</span><b id="garage-coins">0</b></div>
+      <div class="tabs">
+        <button class="tab active" data-tab="upgrades">Upgrades</button>
+        <button class="tab" data-tab="paint">Paint</button>
+        <button class="tab" data-tab="horn">Horn</button>
+        <button class="tab" data-tab="trail">Trails</button>
+        <button class="tab" data-tab="boosts">Boosts</button>
+      </div>
+      <div id="garage-list" class="list"></div>
+      <button class="btn" data-act="back">Done</button>
+    </div>
+  </section>
+
+  <section id="screen-challenges" class="screen hidden">
+    <div class="panel wide">
+      <h2>Challenges</h2>
+      <div class="label">Aaj ke challenges <small id="ch-reset"></small></div>
+      <div id="daily-list" class="list"></div>
+      <div class="label">Achievements</div>
+      <div id="ach-list" class="ach-grid"></div>
+      <div class="label">Top runs</div>
+      <ol id="leaderboard" class="board"></ol>
+      <button class="btn" data-act="back">Back</button>
+    </div>
+  </section>
+
+  <section id="screen-spin" class="screen hidden">
+    <div class="panel wide glow-border">
+      <h2>Lucky Spin 🎡</h2>
+      <p class="tagline" id="spin-note">Roz ik spin free — kismat aazma bhaji!</p>
+      <div class="wheel-wrap">
+        <div class="wheel-pin">▼</div>
+        <div id="wheel"></div>
+      </div>
+      <div id="spin-result" class="spin-result"></div>
+      <button class="btn big shimmer" id="btn-spin">Spin karo!</button>
+      <button class="btn" data-act="back">Back</button>
+    </div>
+  </section>
+
+  <section id="screen-radio" class="screen hidden">
+    <div class="panel wide glow-border">
+      <h2>Peshawar Radio 📻</h2>
+      <div id="station-list" class="list"></div>
+      <div class="label">Meri Playlist <small>— apne gaane add karo (sirf aap ke browser mein save hote hain)</small></div>
+      <div id="song-list" class="list"></div>
+      <label class="btn file-btn">➕ Gaane add karo<input id="song-input" type="file" accept="audio/*" multiple hidden /></label>
+      <button class="btn" data-act="back">Done</button>
+    </div>
+  </section>
+
+  <section id="screen-about" class="screen hidden">
+    <div class="panel wide glow-border about">
+      <h2>About Peshawar Rush</h2>
+      <p>The Peshawar edition of Lahore Rush: an endless 3D runner on a truck-art <b>chingchi</b> (or a 125) through 37 real places of Peshawar — from Qissa Khwani, Chowk Yadgar and Namak Mandi to Bala Hisar Fort, Mahabat Khan Masjid, Islamia College, Saddar, Hayatabad and Bab-e-Khyber at Jamrud. No place repeats until you've seen them all.</p>
+      <div class="label">Engineering highlights</div>
+      <ul class="tech">
+        <li><b>Blender-built hero models.</b> The 125, tonga, bhains, dog, cat, rickshaw, truck and bus are generated by a Python script in Blender and exported as glTF; the garage recolours their materials live. The chingchi, Bala Hisar, Mahabat Khan Masjid, Islamia College, Ghanta Ghar and Bab-e-Khyber are built procedurally in code.</li>
+        <li><b>Synthesised 4-stroke engine.</b> Every combustion pulse is scheduled in real time at rpm/120, so the exhaust note keeps its natural tone from the 11 Hz idle "dug-dug" to the 70 Hz top-gear "brrraap". It has a 4-speed box with throttle cut, clutch dip, gear clunk and downshift blip, plus kick-start, silencer crackle, wind, tyre and chain noise. No audio files.</li>
+        <li><b>Two rides.</b> The Peshawar chingchi — motorbike front, painted tub, tin canopy with jhalar fringe, a driver in pakol and patou — with a two-wheel "do pahiya" stunt, or a leaning 125 with wheelies.</li>
+        <li><b>Built to run smooth on phones.</b> Blender models are merged at load into a few draw calls, the curved world is culled on the CPU, every shader is compiled behind the loading screen, and the render scale adapts to hold 60 fps.</li>
+        <li><b>Endless, never-repeating route.</b> Places are dealt like a shuffled deck, so no place repeats until all 37 have been visited and two neighbouring stretches never share a look.</li>
+        <li><b>Real road surface.</b> Procedural aggregate asphalt with a matching normal map, tyre-polished tracks, worn paint, black-and-yellow kerbs and cat's eyes that glow at night; it turns glossy in the rain.</li>
+        <li><b>Full day.</b> Subah, dopehar, shaam and raat roll by on every run: lit windows, street lamps, neon, headlights, rain and Peshawar dust.</li>
+        <li><b>Curved-world shader + fair spawner.</b> A vertex bend makes the straight track sway over the horizon, and every obstacle has a fixed arrival distance, so an open lane is always guaranteed.</li>
+      </ul>
+      <div class="label">Stack</div>
+      <div class="chips"><span>Blender</span><span>Three.js</span><span>WebGL</span><span>GLSL</span><span>Web Audio</span><span>Vite</span><span>Clerk</span><span>IndexedDB</span><span>PWA</span><span>Vanilla JS</span></div>
+      <div class="credits big">
+        <span>Made in Pakistan <svg class="flag" viewBox="0 0 30 20" aria-label="Pakistan"><rect width="30" height="20" fill="#01411c"/><rect width="7.5" height="20" fill="#fff"/><circle cx="19" cy="10" r="5.2" fill="#fff"/><circle cx="20.4" cy="8.9" r="4.4" fill="#01411c"/><polygon points="22.6,6.2 23.1,7.6 24.6,7.6 23.4,8.5 23.9,9.9 22.6,9.0 21.4,9.9 21.9,8.5 20.6,7.6 22.1,7.6" fill="#fff"/></svg></span>
+        <span>Developer: <a href="https://muhammadtalhakhan2003.github.io/PortFolio_Talha/" target="_blank" rel="noopener">Muhammad Talha Khan ↗</a></span>
+        <em>Is game nu banande hoye koi 125 waala zakhmi nahi hoya — bas developer di neend te siri paye qurbaan hoye. 😴🍲</em>
+      </div>
+      <button class="btn" data-act="back">Back</button>
+    </div>
+  </section>
+
+  <section id="screen-settings" class="screen hidden">
+    <div class="panel wide">
+      <h2>Settings</h2>
+      <label class="setting">Volume <input id="set-volume" type="range" min="0" max="1" step="0.05" /></label>
+      <label class="setting">Music <input id="set-music" type="checkbox" /></label>
+      <label class="setting">Camera shake <input id="set-shake" type="checkbox" /></label>
+      <label class="setting">Graphics
+        <select id="set-quality"><option value="auto">Auto</option><option value="high">High (bloom)</option><option value="low">Low (fast)</option></select>
+      </label>
+      <div class="setting" id="account-row">Account <span id="account-state">Guest</span></div>
+      <button class="btn danger" id="btn-reset">Reset progress</button>
+      <button class="btn" data-act="back">Done</button>
+    </div>
+  </section>
+
+  <section id="screen-howto" class="screen hidden">
+    <div class="panel wide">
+      <h2>How to Play</h2>
+      <ul class="howto">
+        <li>🛺 <b>Chingchi</b> ya 🏍️ <b>125</b> — menu se sawari chuno</li>
+        <li><kbd>←</kbd><kbd>→</kbd> / <kbd>A</kbd><kbd>D</kbd> / swipe — lane badlo (chingchi jhoom jati ae!)</li>
+        <li><kbd>↑</kbd> <kbd>W</kbd> <kbd>Space</kbd> / swipe up — jump (gaddhay, barriers)</li>
+        <li>Hawa mein jump dobara — <b>BACKFLIP</b> (+score, +nitro)</li>
+        <li><kbd>Q</kbd> <kbd>X</kbd> / 🏍️ — <b>DO PAHIYA</b> (chingchi do pahiyon pe) ya <b>WHEELIE</b> (125): jitna lamba, utne points aur nitro</li>
+        <li>😱 Gaddi ke bilkul qareeb se nikal — <b>slow-motion</b> aur bonus!</li>
+        <li>🏁 Sarak pe <b>TERA RECORD</b> ka gate — usay cross kar ke record tod!</li>
+        <li><kbd>↓</kbd> <kbd>S</kbd> / swipe down — brake, stunt khatam, ya hawa se slam down</li>
+        <li><kbd>Shift</kbd> <kbd>N</kbd> / double-tap / ⚡ — <b>Nitro</b>: sab kuch tod do</li>
+        <li><kbd>H</kbd> / tap — horn: agli gaddi side pe ho jati ae (truck aur bhains nahi hatain gi!)</li>
+        <li>🪁 <b>Patangain</b> hawa mein latak rahi hain — jump ya ramp se loot lo: BO KAATA!</li>
+        <li>📞 <b>Ammi ka phone</b>: dahi, naan, doodh ya anday utha lo — dua milegi. Reh gaya to chappal 🩴</li>
+        <li>Near misses, patangon aur stunts se <b>combo</b> x6 tak — phir 🔥 <b>FEVER</b></li>
+        <li>Haath hilati <b>sawari</b>: kinaray wali lane mein uthao, waqt pe utaaro</li>
+        <li>Power-ups: 🧲 Magnet · 🛡 Shield · 2x Coins · ⚡ Nitro · 🍵 Qehwa</li>
+        <li>🔤 <b>P-E-S-H-A-W-A-R</b> letters jama karo — roz ka jackpot Rs 2500!</li>
+        <li>🏍️ <b>Gul Khan Wheelie</b> race lagaye to usay overtake karo</li>
+        <li>📍 37 jagahain, koi do dafa nahi — har gate pe nayi jagah unlock</li>
+        <li>🌅 Menu se <b>waqt</b> chuno: subah, dopehar, shaam ya raat</li>
+        <li><kbd>B</kbd> Headstart · <kbd>V</kbd> Shield Start · <kbd>R</kbd> radio · <kbd>P</kbd> pause · <kbd>M</kbd> mute</li>
+      </ul>
+      <button class="btn" data-act="back">Samajh gaya, chalo lala!</button>
+    </div>
+  </section>
+
+  <section id="screen-pause" class="screen hidden">
+    <div class="panel">
+      <h2>Paused</h2>
+      <p class="tagline">Kehwa break! 🍵 Elaichi wala, kadak.</p>
+      <button class="btn big" data-act="resume">▶ Resume</button>
+      <button class="btn" data-act="settings">⚙ Settings</button>
+      <button class="btn" data-act="quit">Main Menu</button>
+    </div>
+  </section>
+
+  <section id="screen-gameover" class="screen hidden">
+    <div class="panel wide go-panel">
+      <h2 id="go-title">Chingchi Ulat Gayi! 🛺💥</h2>
+      <p class="tagline" id="go-line"></p>
+      <div class="final"><small>FINAL SCORE</small><b id="go-score">0</b><em id="go-new" class="hidden">🎉 New high score!</em></div>
+      <div id="go-best" class="best-line"><span id="go-best-text"></span><i><em id="go-best-bar"></em></i></div>
+      <div id="go-unlocks"></div>
+      <button class="btn big gold hidden" id="btn-revive">❤ Continue — <span id="revive-cost">500</span> Rs</button>
+      <div class="row go-main">
+        <button class="btn big" data-act="play">↻ Phir se!</button>
+        <button class="btn big share" data-act="share">📤 Share</button>
+      </div>
+      <div class="stats grid">
+        <div>Distance <b id="go-distance">0 m</b></div>
+        <div>Coins earned <b id="go-coins">0</b></div>
+        <div>Reached <b id="go-place">—</b></div>
+        <div>Passengers <b id="go-fares">0</b></div>
+        <div>Near misses <b id="go-near">0</b></div>
+        <div>Tricks <b id="go-tricks">0</b></div>
+        <div>Stunts <b id="go-wheelies">0</b></div>
+        <div>Smashed <b id="go-smash">0</b></div>
+        <div>Races won <b id="go-rivals">0</b></div>
+        <div>Patangain looted <b id="go-kites">0</b></div>
+        <div>Letters <b id="go-letters">0</b></div>
+        <div>Max speed <b id="go-speed">0</b></div>
+        <div>Ammi's errands <b id="go-errands">0</b></div>
+      </div>
+      <div class="row">
+        <button class="btn" data-act="garage">🛠 Garage</button>
+        <button class="btn" data-act="menu">Main Menu</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="confetti"></div>
+  <div id="glyph-warm" aria-hidden="true">◀▶❚❤♡🏍️🛺⚡📯🧲🛡️🥛🪁🏆😱🔥💪🎉📍🌅☀️🌇🌙🐾🐕🐈‍⬛📞🩴🥣🫓🥚✋😵🫨💨🌑🤲😎⏩</div>
+  <pre id="debug" class="hidden"></pre>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
